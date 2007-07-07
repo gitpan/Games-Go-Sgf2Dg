@@ -1,9 +1,11 @@
+Changes
 COPYING
 Diagram.pm
 Dg2ASCII.pm
 Dg2Mp.pm
 Dg2PDF.pm
 Dg2Ps.pm
+Dg2SL.pm
 Dg2TeX.pm
 Dg2Tk.pm
 Dg2TkPs.pm

@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 
-# perl code to turn an SGF file into TeX diagrams
+# perl code to turn an SGF file into diagrams
 #   Copyright (C) 1997-2005 Reid Augustin reid@hellosix.com
 #                      1000 San Mateo Dr.
 #                      Menlo Park, CA 94025 USA
@@ -41,7 +41,7 @@ The default B<converter> is Dg2TeX which converts the Diagram to TeX
 source code (sgf2dg is a superset replacement for the sgf2tex script
 and package).  If you have the GOOE fonts (provided in the same
 package as sgf2dg) correctly installed on your system you will be
-able to TeX I<filename>.tex to produce a .dvi file.  You can of
+able to tex I<filename>.tex to produce a .dvi file.  You can of
 course embed all or parts of I<filename>.tex into other TeX
 documents.
 
@@ -53,12 +53,12 @@ use IO::File;
 use Games::Go::Diagram; # the go diagram module
 
 BEGIN {
-    our $VERSION = sprintf "4.%03d", '$Revision: 144 $' =~ /(\d+)/;
+    our $VERSION = sprintf "4.%03d", '$Revision: 211 $' =~ /(\d+)/;
 }
 
 use constant a_MINUS_1 => ord('a') - 1; # base of SGF coordinates is 'a'
 
-my $version = sprintf "version 4.%03d", '$Revision: 144 $' =~ /(\d+)/;
+my $version = sprintf "version 4.%03d", '$Revision: 211 $' =~ /(\d+)/;
 
 my $myName = $0;             # full pathname of this file
 $myName =~ s".*/"";          # delete any preceding path
@@ -70,38 +70,41 @@ my $commandLine = "$0 " . join(' ', @ARGV);
 my $help = <<HELP_END;
 $myName [options] [file.sgf]
 
-    -h | -help                print this message and exit
-    -v | -version             print version number and exit
-    -i | -in                  input file name (STDIN for standard input)
-    -o | -out                 output file name (STDOUT for standard output)
-    -t | -top                 top line in diagram
-    -b | -bottom              bottom line in diagram
-    -l | -left                leftmost line in diagram
-    -r | -right               rightmost line in diagram
-    -break | -breakList       a list of first move in each diagram
-    -m | -movesPerDiagram     number of moves per diagram
-    -d | -doubleDigits        label stones modulo 100
-    -n | -newNumbers          begin each diagram with number 1
-    -rv | -relativeVarNums    start each variation from 1
-    -av | -absoluteVarNums    move numbers in variation == main line numbers
-    -cv | -correlativeVarNums start main variations from 1 
-    -rl | -repeatLast         repeat last move as first in next diagram
-    -il | -ignoreLetters      ignore SGF letters
-    -im | -ignoreMarks        ignore SGF marks
-    -iv | -ignoreVariations   ignore SGF variations
-    -ip | -ignorePass         ignore SGF pass moves
-    -ia | -ignoreAll          ignore SGF letters, marks, variations, and passes
-    -firstDiagram             first diagram to print
-    -lastDiagram              last diagram to print
-    -longComments             allow page breaks in comments
-    -simple                   use a very simple TeX format
-    -coords                   print coordinates
-    -twoColumn                use two-column format
-    -bigFonts                 use fonts magnified 1.2 times
-    -texComments              \\, { and } in comments not modified
-    -gap                      gap in points between diagrams (default: 12)
-    -converter | -convert     name of a Diagram converter (see below)
-    -verbose                  print diagnostic information about move
+    -h | -help                 print this message and exit
+    -v | -version              print version number and exit
+    -verbose                   print diagnostic information
+    -i | -in                   input file name (STDIN for standard input)
+    -o | -out                  output file name (STDOUT for standard output)
+    -t | -top                  top line in diagram
+    -b | -bottom               bottom line in diagram
+    -l | -left                 leftmost line in diagram
+    -r | -right                rightmost line in diagram
+    -crop                      auto-crop diagram
+    -break | -breakList        a list of first move in each diagram
+    -m | -movesPerDiagram      number of moves per diagram
+    -d | -doubleDigits         label stones modulo 100
+    -n | -newNumbers           begin each diagram with number 1
+    -rv | -relativeVarNums     start each variation from 1
+    -av | -absoluteVarNums     move numbers in variation == main line numbers
+    -cv | -correlativeVarNums  start main variations from 1 
+    -rl | -repeatLast          repeat last move as first in next diagram
+    -il | -ignoreLetters       ignore SGF letters
+    -im | -ignoreMarks         ignore SGF marks
+    -iv | -ignoreVariations    ignore SGF variations
+    -ip | -ignorePass          ignore SGF pass moves
+    -ia | -ignoreAll           ignore SGF letters, marks, variations, and passes
+    -firstDiagram              first diagram to print
+    -lastDiagram               last diagram to print
+    -placeHandi                place handicap stones on board (old style)
+    -coords                    print coordinates
+    -cs | -coordStyle style    coordinate style: normal, sgf, or numeric
+    -c | -convert | -converter name of a Diagram converter (see below)
+    -simple                    use a very simple TeX format
+    -mag number                TeX \\magnification - default is 1000
+    -twoColumn                 use two-column format
+    -bigFonts                  use fonts magnified 1.2 times
+    -texComments               \\, {, and } in comments not modified
+    -floatControl string       'string' controls float (diagram) placement
 
     The -i and -o options are not needed with normal usage:
              $myName [options] name
@@ -136,25 +139,21 @@ $myName [options] [file.sgf]
  can start from 1 at the beginning of each variation tree
  (-correlativeVarNums).
 
-    -longComments implements more elaborate TeX to allow page breaks
- in the comments. Use this if comments are very extensive. It cannot
- be used with -simple or -twoColumn.
+    -coords adds coordinates to right and bottom edges.
 
-    -simple uses a very simple TeX format. This option may be useful
- if you intend to edit the resulting TeX file by hand. -longComments
- and -simple should not be used together.
+    -coordStyle style sets the coordinate style.  The default is
+ normal which puts descending numbers on the vertical axis and ascending
+ letters (skipping I) on the horizontal axis.  style may also be set to
+ sgf to see the coordinates used inside the SGF file, or to one of:
 
-    -twoColumn uses a two-column format with small fonts. This cannot 
- be used with -coords or -longComments.
+    ++    ascending numbers on both axes (0,0 in upper left)
+    +-    ascending x axis, descending y axis (0,0 in lower left)
+    -+    both ascending numbers on both axes (0,0 in upper right)
+    --    descending numbers on both axes (0,0 in lower right)
 
-    -coords prints a coordinate grid. It cannot be used with
- -twoColumn.
-
-    -texComments is appropriate if your sgf comments contain TeX.
- If this option is NOT used, \\ { and } are replaced by /, [ and ]
- since these characters are not available in TeX roman fonts. If
- this -texComments is used, this change is not made so you can put
- code to {\\bf change fonts} in your comments.
+    Recent SGF formats require AB (add-black) to place handicap stones
+ on the board.  Use -placeHandi for old style SGF files that don't
+ contain the explicit AB notations.
 
     -converter changes the output converter.  The default converter
  is Games::Go::Dg2Tex.  All converters get 'Games::Go::Dg2'
@@ -169,11 +168,45 @@ $myName [options] [file.sgf]
     Ps        - PostScript
     Tk        - perl/Tk NoteBook window
     TkPs      - PostScript from the Tk NoteBook
+    SL        - Sensei's Library (by Marcel Gruenauer)
 
     Example:    \$ $myName ... -converter ASCII ...
 
     See the perldoc or man pages for details on converter-specific
  options (eg: 'perldoc Games::Go::Dg2TeX' or 'man Games::Go::Dg2PDF').
+
+    -simple (Dg2TeX) uses a very simple TeX format. This option may be
+ useful if you intend to edit the resulting TeX file by hand.
+
+    -mag (Dg2TeX) changes the default \\magnification from 1000.
+
+    -twoColumn (Dg2TeX) uses a two-column format with small fonts.
+
+    -texComments (Dg2TeX) is appropriate if your sgf comments contain TeX.
+ If this option is NOT used, \\ { and } are replaced by /, [ and ]
+ since these characters are not available in TeX roman fonts. If
+ -texComments is used, these changes are not made, so you can add
+ TeX code to {\\bf change fonts} in your comments.
+
+    -floatControl 'control_string' (Dg2TeX)
+ Normally (not -simple and not -twoColumn), Dg2TeX floats the diagram to
+ the left or the right of the accompanying text.  -floatControl allows you
+ to specify the position of each diagram.  control_string is a sequence of
+ letters which specify where each diagram should be positioned.  The
+ letters may be:
+
+        'l'  : diagram left
+        'r'  : diagram right
+        'a'  : alternate left and right
+        other: random left or right
+
+ control_string letters are consumed, one per diagram, until one letter is
+ left.  The final letter is used for all remaining diagrams.
+
+ The default control_string is 'rx' which places the first diagram on
+ the right (text on the left) and all remaining diagrams are placed
+ randomly.
+
 
     More details on $myName can be found in the perldoc or man
  pages: 'perldoc $myName' or 'man $myName'.
@@ -357,14 +390,14 @@ sub SGF_ProcessVariation {
         if ((@{$option{breakList}} > 0) and
             ($diagram->last_number >= $option{breakList}[0])) {
             printVerbose('BreakList: ');
-            shift(@{$option{breakList}});
+            my $m = shift(@{$option{breakList}});
             @lastMove2 = @lastMove1;        # use last 1 for repeatLast
-            finishDiagram();
+            finishDiagram(undef, "BreakList at move $m");
         }
         if (($diagram->last_number - $diagram->first_number + 1) >= $option{movesPerDiagram} + $option{repeatLast}) {
             printVerbose('movesPerDiagram: ');
             @lastMove2 = @lastMove1;        # use last 1 for repeatLast
-            finishDiagram();
+            finishDiagram(undef, "movesPerDiagram");
         }
         if ($option{doubleDigits} and
             ($option{newNumbers} ?
@@ -373,7 +406,7 @@ sub SGF_ProcessVariation {
                      ($diagram->last_number % 100 == 0)))) {
             printVerbose('doubleDigits: ');
             @lastMove2 = @lastMove1;        # use last 1 for repeatLast
-            finishDiagram();
+            finishDiagram(undef, "doubleDigits");
         }
         $prevChr = $chr;
     } 
@@ -392,7 +425,7 @@ sub SGF_ProcessNode {
     for(;;) {
         my $shortPropID = SGF_GetShortPropID(SGF_GetPropID($fileID));
         last if ($shortPropID eq '');
-        while((my $propVal = SGF_GetPropVal($fileID)) ne '') {
+        while((defined (my $propVal = SGF_GetPropVal($fileID)))) {
             push(@{$props{$shortPropID}}, $propVal);
         }
 
@@ -423,11 +456,18 @@ sub SGF_ProcessProperty {
     my ($shortPropID, $propVals) = @_;
 
     foreach my $propVal (@{$propVals}) {
-        if (($shortPropID eq 'W') or
-            ($shortPropID eq 'B')) {            # White and Black (coordList)
+    # Move properties
+        if (($shortPropID eq 'W') or            # W[pt]       Play white move
+            ($shortPropID eq 'B')) {            # B[pt]       Play black move
             $moveNum++;
-            if ($propVal eq 'tt') {
-                $diagram->property($moveNum, $shortPropID, $propVal) unless($option{ignorePass});
+            if (($propVal eq '') or             # new style pass
+                (($option{boardSizeX} <= 19) and
+                 ($option{boardSizeY} <= 19) and
+                 ($propVal eq 'tt'))) {         # old (non-scalable) style pass
+                unless($option{ignorePass}) {
+                    printVerbose("Pass($shortPropID), move=$moveNum\n");
+                    $diagram->property($moveNum, $shortPropID, 'pass');
+                }
             } else {
                 printVerbose("Playing $propVal, color=$shortPropID, move=$moveNum\n");
                 my $int = $diagram->get($propVal);
@@ -436,84 +476,219 @@ sub SGF_ProcessProperty {
                 @lastMove1 = ($propVal, $shortPropID, $moveNum);
                 push(@nodePlays, $propVal);
             }
-        } elsif (($shortPropID eq 'AW') or
-                 ($shortPropID eq 'AB')) {      # AddWhite and AddBlack (coordList)
-            printVerbose("Adding stone at move $moveNum: $propVal\n");
-            if ($diagram->last_number) {
-                finishDiagram();                 # need a new diagram
+        } elsif ($shortPropID eq 'KO') {        # KO          force illegal move
+            # ignore
+            printVerbose("$shortPropID (force move), move=$moveNum\n");
+            $diagram->property($moveNum, $shortPropID, '')
+        } elsif ($shortPropID eq 'MN') {        # MN[num]  set move number
+            printVerbose("Set move number to $propVal at move $moveNum\n");
+            $moveNum = $propVal - 1;        # TODO does this work at all?
+    # Setup properties
+        } elsif (($shortPropID eq 'AW') or      # AW[pt]      AddWhite 
+                 ($shortPropID eq 'AB')) {      # AB[pt]      AddBlack
+            finishDiagram(undef, "AddB/W");        # need a new diagram
+            my $color = substr($shortPropID, 1, 1);
+            printVerbose("Add $color stone to $propVal at move $moveNum\n");
+            foreach(composed_pt($propVal)) {
+                $diagram->put($_, $color);
             }
-            my $color = ($shortPropID eq 'AB') ? 'B' : 'W';
-            printVerbose("Adding $color stone to $propVal at move $moveNum\n");
-            $diagram->put($propVal, $color);
-        } elsif ($shortPropID eq 'C') {         # Comment
-            if ($propVal =~ m/\S/m) {           # if nothing but whitespace, delete
-                printVerbose("Adding comment at move $moveNum:\n$propVal\n");
-                $diagram->property($moveNum, $shortPropID, $propVal);
-            }
-        } elsif ($shortPropID eq 'N') {         # Name (node name)
-            if(defined($propVal) and
-               ($propVal ne '')) {              # no name? return
-                printVerbose("Adding name at move $moveNum: $propVal\n");
-                if ($diagram->last_number) {
-                    @lastMove2 = @lastMove1;        # use last 1 for repeatLast
-                    finishDiagram();                # node names should be at the start of the diagram
-                }
-                $diagram->property($moveNum, $shortPropID, $propVal);
-            }
-        } elsif ($shortPropID eq 'SZ') {
-            $option{boardSize} = $propVal;
-        } elsif ($shortPropID eq 'AE') {        # AddEmpty
-            printVerbose("Adding empty at move $moveNum: $propVal\n");
-            if ($diagram->last_number) {
-                finishDiagram();                 # need a new diagram
-            } else {# if no stones played yet
+        } elsif ($shortPropID eq 'AE') {        # AE[pt]      AddEmpty
+            finishDiagram(undef, "AddEmpty");
+            printVerbose("Empty (remove) $propVal at move $moveNum\n");
+            unless ($diagram->last_number) { # if no stones played yet
                 # keep track of number of stones removed at the
                 # start of the diagram so we can figure out which
                 # move in the parent diagram spawned the variation
                 $removedCount++;
                 $diagram->user->{removedCount} = $removedCount;
             }
-            $diagram->remove($propVal);
-        } elsif ($shortPropID eq 'HA' and
-                 $propVal) {                    # non-zero HAndicap
-            foreach(@{hoshi($propVal)}) {
-                $diagram->put($_, 'B');
+            foreach(composed_pt($propVal)) {
+                $diagram->remove($_);
             }
-        } elsif ($shortPropID eq 'L') {         # letter
-            unless ($option{ignoreLetters}) {
-                $diagram->label($propVal, $currentLetter++);
-                printVerbose("Adding letter \"$currentLetter\" at $propVal move $moveNum\n");
+        } elsif ($shortPropID eq 'PL') {        #PL[W|B]      set Player
+            # ignore
+            printVerbose("$shortPropID $propVal (set player), move=$moveNum\n");
+            $diagram->property($moveNum, $shortPropID, $propVal)
+    # Node annotation properties
+        } elsif ($shortPropID eq 'C') {         # C[text]     Comment
+            if ($propVal =~ m/\S/m) {           # if nothing but whitespace, delete
+                printVerbose("Add comment at move $moveNum:\n$propVal\n");
+                $diagram->property($moveNum, $shortPropID, text($propVal));
             }
-        } elsif (($shortPropID eq 'M') or ($shortPropID eq 'MA')) {     # mark
-            unless ($option{ignoreMarks}) {
-                $diagram->mark($propVal);
-                printVerbose("Adding mark at $propVal move $moveNum\n");
+        } elsif (($shortPropID eq 'DM') or      # DM[dbl]     Even position
+                 ($shortPropID eq 'GB') or      # GB[dbl]     Good for black
+                 ($shortPropID eq 'GW') or      # GW[dbl]     Good for white
+                 ($shortPropID eq 'HO') or      # HO[dbl]     Hotspot
+                 ($shortPropID eq 'UC')) {      # UC[dbl]     Unclear
+            # ignore ?
+            printVerbose("$shortPropID $propVal (position evaluation), move=$moveNum\n");
+            $diagram->property($moveNum, $shortPropID, $propVal)
+        } elsif ($shortPropID eq 'N') {         # N[stxt]     Name (node name)
+            if(defined($propVal) and
+               ($propVal ne '')) {              # no name? return
+                finishDiagram(undef, "Named node");     # node names should be at the start of the diagram
+                if ($diagram->last_number) {
+                    @lastMove2 = @lastMove1;    # use last 1 for repeatLast
+                }
+                $propVal = simple_text($propVal);
+                printVerbose("Node name to $propVal at move $moveNum\n");
+                $diagram->property($moveNum, $shortPropID, $propVal);
             }
-        } elsif ($shortPropID eq 'LB') {        # label
+        } elsif ($shortPropID eq 'V ') {        # V[real]     Value (estimated game score)
+            # ignore ?
+            printVerbose("$shortPropID $propVal (value estimate), move=$moveNum\n");
+            $diagram->property($moveNum, $shortPropID, $propVal)
+    # Move annotation properties
+        } elsif (($shortPropID eq 'BM') or      # BM[dbl]     bad move
+                 ($shortPropID eq 'DO') or      # DO          doubtful move
+                 ($shortPropID eq 'IT') or      # IT          interesting move
+                 ($shortPropID eq 'TE')) {      # TE[dbl]     tesuji (good move)
+            # ignore?
+            printVerbose("$shortPropID $propVal (move evaluation), move=$moveNum\n");
+            $diagram->property($moveNum, $shortPropID, $propVal)
+    # Markup properties
+        } elsif ($shortPropID eq 'AR') {        # AR[c_pt]    Arrow
+            printVerbose("Arrow: $propVal move $moveNum\n");
+            $diagram->property($moveNum, $shortPropID, $propVal)
+        } elsif ($shortPropID eq 'DD') {        # DD[elst]    Dim points: DD[] clears any previous dimming
+            printVerbose("Dim $propVal move $moveNum\n");
+            $diagram->property($moveNum, $shortPropID, $propVal)
+        } elsif ($shortPropID eq 'LB') {        # LB[pt:stxt] Label point with text
             unless ($option{ignoreMarks}) {
                 my ($item, $coord, $label);
                 foreach $item (split(/\s+/, $propVal)) {
-                    ($coord, $label) = split(/:/, $item);
-                    if (length($coord) < 2) {   # didn't work? hmmm, let's try the other way around
-                        ($label, $coord) = split(/:/, $item);
+                    ($coord, $label) = ($item =~ m/(.*):(.*)/);
+                    if (length($coord) != 2) {   # didn't work? hmmm, let's try the other way around
+                        ($label, $coord) = ($label, $coord);
                     }
-                    $label =~ s/(.).*/$1/m;     # stupid: labels can now be long!
+                    $label = simple_text($label);
+                    printVerbose("Label \"$label\" at $coord move $moveNum\n");
                     $diagram->label($coord, $label);
-                    printVerbose("Adding label \"$label\" at $coord move $moveNum\n");
                 }
             }
-        } elsif (($shortPropID eq 'VW') or      # VieW
-                 ($shortPropID eq 'FF') or      # FileFormat
-                 ($shortPropID eq 'GM') or      # GaMe
-                 ($shortPropID eq 'KO') or      # KO illegal move??
-                 ($shortPropID eq 'PL') or      # PLayer
-                 ($shortPropID eq 'CR') or      # CiRcle (duh!)
-                 ($shortPropID eq 'WL') or      # WhiteLeft (time)
-                 ($shortPropID eq 'BL') or      # BlackLeft (time)
-                 ($shortPropID eq 'WS') or      # WhiteSpecies
-                 ($shortPropID eq 'BS')) {      # BlackSpecies
+        } elsif ($shortPropID eq 'LN') {        # LN[c_pt]    Line
+            printVerbose("Line: $propVal move $moveNum\n");
+            $diagram->property($moveNum, $shortPropID, $propVal)
+        } elsif (
+                 ($shortPropID eq 'CR') or      # CR[pt]      circle
+                 ($shortPropID eq 'M') or       # M[pt]       old style mark
+                 ($shortPropID eq 'MA') or      # MA[pt]      mark (X)
+                 ($shortPropID eq 'SQ') or      # SQ[pt]      square
+                 ($shortPropID eq 'TR')) {      # TR[pt]      triangle
+            $shortPropID = 'TR' if (($shortPropID eq 'M') or            # old style marks were assumed to be triangles
+                                    ($option{converter} eq 'SL') or     # Sensei's Library only understands one kind of mark
+                                    ($option{converter} eq 'ASCII'));   # ASCII converter only understands one kind of mark
+            unless ($option{ignoreMarks}) {
+                printVerbose("$shortPropID mark at $propVal move $moveNum\n");
+                foreach(composed_pt($propVal)) {
+                    $diagram->mark($_, $shortPropID);
+                }
+            }
+        } elsif ($shortPropID eq 'SL') {        # SL[pt]      Select points (markup unknown)
+            printVerbose("Select points $propVal move $moveNum\n");
+            $diagram->property($moveNum, $shortPropID, $propVal)
+    # Root properties
+        } elsif (($shortPropID eq 'AP') or      # AP[stxt:stxt] application name:version
+                 ($shortPropID eq 'CA') or      # CA[stxt]    charset
+                 ($shortPropID eq 'FF') or      # FF[1-4]     FileFormat
+                 ($shortPropID eq 'GM') or      # GM[1-16]    Game
+                 ($shortPropID eq 'ST')) {      # ST[0-3]     how to show variations (style?)
             # ignore
+            printVerbose("$shortPropID $propVal (root property), move=$moveNum\n");
+            $diagram->property(0, $shortPropID, $propVal)
+        } elsif ($shortPropID eq 'SZ') {        # SZ[num[:num] board size [cols[:rows]]
+            if ($propVal =~ m/(\d+):(\d+)/) {
+                $option{boardSizeX} = $1;
+                $option{boardSizeY} = $2;
+            } else {
+                $option{boardSizeX} = $propVal;
+                $option{boardSizeY} = $propVal;
+            }
+    # Game info properties
+        } elsif (($shortPropID eq 'AN') or       # AN[stxt]     annotater (name)
+                 ($shortPropID eq 'BR') or       # BR[stxt]     Black rank
+                 ($shortPropID eq 'WR') or       # WR[stxt]     White rank
+                 ($shortPropID eq 'BT') or       # BT[stxt]     black team
+                 ($shortPropID eq 'WT') or       # WT[stxt]     white team
+                 ($shortPropID eq 'CP') or       # CP[stxt]     copyright
+                 ($shortPropID eq 'DT') or       # DT[stxt]     Date
+                 ($shortPropID eq 'EV') or       # EV[stxt]     Event
+                 ($shortPropID eq 'ON') or       # ON[stxt]     opening information
+                 ($shortPropID eq 'OT') or       # OT[stxt]     overtime description (byo-yomi)
+                 ($shortPropID eq 'PC') or       # PC[stxt]     place game was played
+                 ($shortPropID eq 'PB') or       # PB[stxt]     Player Black
+                 ($shortPropID eq 'PW') or       # PW[stxt]     Player White
+                 ($shortPropID eq 'RE') or       # RE[stxt]     result
+                 ($shortPropID eq 'RO') or       # RO[stxt]     round
+                 ($shortPropID eq 'RU') or       # RU[stxt]     rules
+                 ($shortPropID eq 'SO') or       # SO[stxt]     source
+                 ($shortPropID eq 'US')) {       # US[stxt]     user/program who entered the game
+            $propVal = simple_text($propVal);
+            printVerbose("${shortPropID} $propVal (game info), move=$moveNum\n");
+            $diagram->property(0, $shortPropID, $propVal);
+        } elsif (($shortPropID eq 'GC') or       # GC[text]   game comment
+                 ($shortPropID eq 'TM')) {       # TM[real]   time limits
+            $propVal = simple_text($propVal);
+            printVerbose("${shortPropID} $propVal (game info), move=$moveNum\n");
+            $diagram->property(0, $shortPropID, $propVal);
+    # Timing properties
+        } elsif (($shortPropID eq 'BL') or      # BL[real]    BlackLeft (time)
+                 ($shortPropID eq 'WL') or      # WL[real]    WhiteLeft (time)
+                 ($shortPropID eq 'OB') or      # OB[num]     Black moves left (after this move)
+                 ($shortPropID eq 'OW')) {      # OW[num]     White moves left
+            # ignore
+            printVerbose("${shortPropID} $propVal (time/byo-yomi info), move=$moveNum\n");
+            $diagram->property($moveNum, $shortPropID, $propVal);
+    # Go-specific properties
+        } elsif ($shortPropID eq 'HA' and       # HA[num]     handicap, but should not place stones, notation only
+                 $propVal !~ m/\D/ and          # digits only
+                 $propVal >= 2) {               # at least two
+            printVerbose("Handicap $propVal at move $moveNum\n");
+            if ($option{placeHandi}) {
+                foreach(@{hoshi($propVal)}) {
+                    printVerbose("Place handicap on $_\n");
+                    $diagram->put($_, 'B');
+                }
+            }
+            $diagram->property(0, $shortPropID, $propVal);  # a game property
+        } elsif ($shortPropID eq 'KM') {        # KM[real]    komi
+            printVerbose("Komi $propVal at move $moveNum\n");
+            $diagram->property(0, $shortPropID, $propVal);  # a game property
+        } elsif (($shortPropID eq 'TB') or      # TB[el_pt]   black territory
+                 ($shortPropID eq 'TW')) {      # TW[el_pt]   white territory
+            my $color = substr($shortPropID, 1, 1);
+            printVerbose("Territory for $color at $propVal move $moveNum\n");
+            $diagram->territory($shortPropID, $propVal);
+    #Misc. properties
+        } elsif ($shortPropID eq 'L') {         # L[pt]   next letter at pt (deprecated)
+            unless ($option{ignoreLetters}) {
+                $diagram->label($propVal, $currentLetter);
+                printVerbose("Letter \"$currentLetter\" at $propVal move $moveNum\n");
+                $currentLetter++;
+            }
+        } elsif ($shortPropID eq 'FG') {        # FG[pt:stext]] Figure - see spec
+            printVerbose("${shortPropID} $propVal, move=$moveNum\n");
+            $diagram->property($moveNum, 'C', $propVal);    # treat like a comment
+        } elsif ($shortPropID eq 'PM') {        # PM[num]       Print mode: 0=>no numbers, 1=>normal 2=>modulo 100 (see spec for details)
+            # ignore
+            printVerbose("${shortPropID} $propVal, move=$moveNum\n");
+            $diagram->property($moveNum, $shortPropID, $propVal);
+        } elsif ($shortPropID eq 'VW') {        # VW[pt:pt]     View parts of board - show only listed points, VW[] clears any previous views
+            printVerbose("View $propVal\n");
+            if ($propVal ne '') {
+                foreach (composed_pt($propVal)) {
+                    $diagram->view($_);
+                }
+                finishDiagram(undef, "VieW");   # views need to end the diagram
+            } else {
+                $diagram->view($_);             # clears a previous view
+            }
+        } elsif (($shortPropID eq 'BS') or      # BS[stext]     BlackSpecies (deprecated)
+                 ($shortPropID eq 'WS')) {      # WS[stext]     WhiteSpecies (deprecated)
+            printVerbose("Species (${shortPropID}) $propVal\n");
+            $diagram->property(0, $shortPropID, $propVal);
         } else {
+            printVerbose("Unknown property: ${shortPropID} $propVal, move=$moveNum\n");
             $diagram->property($moveNum, $shortPropID, $propVal);       # shrug
         }
     }
@@ -549,12 +724,12 @@ sub SGF_GetPropVal {
     $chr = skipToToken($fileID);
     if ($chr ne '[') {
         ungetC($fileID, $chr);
-        return('');              # no more proerty values
+        return undef;   # no more property values
     }
     for(;;) {
         $chr = getC($fileID);
-        if ($chr eq "\\") {
-            $propVal .= getC($fileID);
+        if ($chr eq '\\') {
+            $propVal .= '\\' . getC($fileID);
         } elsif ($chr eq ']') {
             return($propVal);
         } elsif (($chr eq '') and eof($fileID)) {
@@ -589,10 +764,54 @@ sub Coords2SGF {
     return("$x$y");
 }
 
+sub text {
+    my ($text) = @_;
+
+    $text =~ s/\n\r/\n/gm;      # all newline/returns to newlines
+    $text =~ s/\r\n/\n/gm;      # all return/newlines to newlines
+    $text =~ s/\r/\n/gm;        # all stand-alone returns to newlines
+    $text =~ s/\\\n//gm;        # remove backslashed newlines
+    $text =~ s/(\s)/($1 eq "\n") ? "\n" : ' '/egm;  # convert all non-newline whitespace into space
+    $text =~ s/\\(.)/$1/gm; # other backslashed chars are taken literally
+    return $text;
+}
+
+sub simple_text {
+    my ($text) = @_;
+
+    $text = text($text);
+    $text =~ s/\n/ /gm;     # all remaining newlines turn into spaces
+    return $text;
+}
+
+# composed points look like pt:pt (or perhaps just pt or even '').  pt:pt means
+#   all the points in the rectangle from upper left to lower right.
+sub composed_pt {
+    my ($text) = @_;
+
+    if (my ($p1, $p2) = ($text =~ m/^(.+):(.+)$/)) {
+        my ($x1, $y1) = split('', $p1);
+        my ($x2, $y2) = split('', $p2);
+        ($x2, $x1) = ($x1, $x2) if ($x1 gt $x2);
+        ($y2, $y1) = ($y1, $y2) if ($y1 gt $y2);
+        my @r;
+        foreach my $y ($y1 .. $y2) {
+            foreach my $x ($x1 .. $x2) {
+                push (@r, "$x$y");
+            }
+        }
+        return @r;
+    }
+    return $text;
+}
+
 # returns a ref to list of SGF coords for hoshi (or handicap) points
 sub hoshi {
     my ($num) = @_;
 
+    if ($option{boardSizeX} != $option{boardSizeY}) {
+        return;
+    }
     my %hoshiTable = (21 => [4, 11, 18],
                       19 => [4, 10, 16],
                       17 => [4, 9,  14],
@@ -606,13 +825,13 @@ sub hoshi {
 
     unless(defined($num)) {
         # 11x11 and smaller get 5 hoshi points
-        $num = ($option{boardSize} > 11) ? 9 : 5;
+        $num = ($option{boardSizeX} > 11) ? 9 : 5;
     }
     my ($a, $b, $c);
-    if (exists($hoshiTable{$option{boardSize}})) {
-        ($a, $b, $c) = @{$hoshiTable{$option{boardSize}}};
+    if (exists($hoshiTable{$option{boardSizeX}})) {
+        ($a, $b, $c) = @{$hoshiTable{$option{boardSizeX}}};
     } else {
-        print(STDERR "I don't know about hoshi/handicaps for boardSize $option{boardSize}\n");
+        print(STDERR "I don't know about hoshi/handicaps for boardSize $option{boardSizeX}\n");
         return;
     }
 
@@ -662,7 +881,7 @@ sub HasLibs {
         die("Oops, recursion > 1000 while checking for liberties at move $moveNum coords ($x,$y)\n" .
             "This isn't supposed to be possible!  Aborting...\n");
     }
-    if (($x < 1) or ($x > ($option{boardSize})) or ($y < 1) or ($y > ($option{boardSize}))) {
+    if (($x < 1) or ($x > ($option{boardSizeX})) or ($y < 1) or ($y > ($option{boardSizeY}))) {
         return(0);              # oops! off the board.
     }
     return 0 if (exists($been_here->{"$x,$y"})); # we've been here before
@@ -696,11 +915,18 @@ sub RemoveGroup {
 }
 
 sub finishDiagram {
-    my ($d, $done) = @_;
+    my ($d, $cause) = @_;
 
-    my $prevDiagram = $diagram;
-    $diagram = $diagram->next;                  # start a fresh diagram
-    $diagram->user({id => $diagramId++});       # init user hash
+    $d = $diagram unless(defined($d));
+    return unless ($d->actions_done);       # no new actions pending? just use current diagram
+    if (exists($d->user->{mainId})) {
+        printVerbose("Finish Diagram ", $d->user->{mainId}, " at move $moveNum due to $cause\n");
+    } else {
+        printVerbose("Finish Variation at move $moveNum due to $cause\n");
+    }
+    my $prevDiagram = $d;
+    $diagram = $d->next;                    # start a fresh diagram
+    $diagram->user({id => $diagramId++});   # init user hash
     if (exists($prevDiagram->user->{mainId})) {
         my $mainId = $prevDiagram->user->{mainId} + 1;
         $diagram->user->{mainId} = $mainId;
@@ -778,6 +1004,8 @@ sub convertDiagram {
         my ($dNum, $dName) = nameDiagram($diagram, $sequence++, $level);
         if(($dNum >= $option{firstDiagram}) and
            ($dNum <= $option{lastDiagram})) {
+            auto_bounds($dg2, $diagram);    # crop (auto-bounds) courtesy of Marcel
+                                            #   Gruenauer and Dg2SL
             $diagram->hoshi(@{hoshi()});    # add hoshi points to board
             $diagram->offset($diagram->first_number - 1) if ($option{newNumbers} and
                                                              $diagram->first_number);
@@ -811,10 +1039,15 @@ $option{repeatLast} = 0;
 $option{newNumbers} = 0;
 $option{firstDiagram} = 1;
 $option{lastDiagram} = 10000;
-$option{boardSize} = 19;
+$option{boardSizeX} = 19;
+$option{boardSizeY} = 19;
+$option{coords_style} = 'normal';   # standard coordinate style
 $option{breakList} = [];
 $option{coords} = 0;
+$option{coordStyle} = 'normal';
+$option{floatControl} = 'rx';
 $option{verbose} = 0;
+$option{placeHandi} = 0;
 
 $option{converter} = 'TeX';
 
@@ -923,7 +1156,7 @@ diagrams until the end.
 
 =item B<-coords>
 
-Generates a coordinate grid. This option may not be used with B<-twoColumn>.
+Adds coordinates to right and bottom edges.
 
 =item B<-verbose>
 
@@ -950,6 +1183,8 @@ with the current distribution package are:
 =item   L<Games::Go::Dg2Tk>        Perl/Tk NoteBook/Canvas
 
 =item   L<Games::Go::Dg2TkPs>      PostScript via Dg2Tk (Dg2Ps is prefered)
+
+=item   L<Games::Go::Dg2SL>        Sensei's Library (by Marcel Gruenauer)
 
 =back
 
@@ -1056,25 +1291,19 @@ or
 
 =over 4
 
-=item B<-longComments>
-
-(Dg2TeX) In its default usage, the comments to each diagram
-comprise an unbreakable vbox---they must all appear on one page.
-This can cause problems if the comments are very extensive. This
-option generates more complicated TeX macros which allow the
-comments to be broken across pages. This option may not be used
-with B<-simple> or B<-longComments>.
-
 =item B<-simple>
 
 (Dg2TeX) This generates very simple TeX which may not look so
 good on the page, but is convenient if you intend to edit the
-TeX. This option should not be used with B<-longComments>.
+TeX.
+
+=item B<-mag number>
+
+(Dg2TeX) Changes the default \\magnification from 1000 to number.
 
 =item B<-twoColumn>
 
 (Dg2TeX) This generates a two-column format using smaller fonts.
-This option may not be used with B<-longComments> or B<-coords>.
 
 =item B<-bigFonts>
 
@@ -1088,10 +1317,30 @@ fonts do not have these characters. If this option is used, these
 substitutions are not made, so you can embed TeX source (like
 {\bf change fonts}) directly inside the comments.
 
-=item B<-gap>
+=item B<-floatControl 'control_string'>
 
-(Dg2TeX) The vertical gap (in points) between diagrams.  Default
-is 12 points.
+(Dg2TeX) Dg2TeX can float the diagram to the left or the right of
+the accompanying text.  B<-floatControl> allows you to specify the position
+of each diagram.  B<control_string> is a sequence of letters which specify
+where each diagram should be positioned.  The letters may be:
+
+=over 4
+
+=item 'l': left
+
+=item 'r': right
+
+=item 'a': alternate
+
+=item other: random
+
+=back
+
+B<control_string> letters are consumed, one per diagram, until there is
+only one letter left.  The final letter is used for all remaining diagrams.
+
+The default B<control_string> is 'rx' which places the first diagram on the
+right (text on the left) and all remaining diagrams are placed randomly.
 
 =back
 
@@ -1145,8 +1394,20 @@ while (scalar(@ARGV)) {
         $option{leftLine} = shift(@ARGV);
     } elsif (($arg eq '-r') or ($arg eq '-right')) {
         $option{rightLine} = shift(@ARGV);
+    } elsif ($arg eq '-crop') {
+        $option{crop} = 1;
+    } elsif ($arg eq "-placeHandi") {
+        $option{placeHandi} = 1;
     } elsif ($arg eq "-coords") {
         $option{coords} = 1;
+    } elsif (($arg eq '-cs') or ($arg eq "-coordStyle")) {
+        $option{coordStyle} = lc(shift(@ARGV));
+        my %legal = (normal => 1, sgf    => 1,
+                     '++'   => 1, '+-'   => 1,
+                     '-+'   => 1, '--'   => 1);
+        unless (exists($legal{$option{coordStyle}})) {
+            die "illegal coordStyle: $option{coordStyle}, must be: normal, sgf, ++, +-, -+, or --\n";
+        }
     } elsif ($arg eq '-firstDiagram') {
         $option{firstDiagram} = shift(@ARGV);
     } elsif ($arg eq '-lastDiagram') {
@@ -1167,14 +1428,17 @@ while (scalar(@ARGV)) {
         $option{converterOption}{texComments} = 1;
     } elsif ($arg eq '-bigFonts') {
         $option{converterOption}{bigFonts} = 1;
-    } elsif ($arg eq '-longComments') {
-        $option{converterOption}{longComments} = 1;
     } elsif ($arg eq '-simple') {
         $option{converterOption}{simple} = 1;
+    } elsif ($arg eq '-mag') {
+        $option{converterOption}{mag} = shift(@ARGV);
     } elsif ($arg eq '-twoColumn') {
         $option{converterOption}{twoColumn} = 1;
-    } elsif ($arg eq '-gap') {
-        $option{converterOption}{gap} = shift(@ARGV);
+    } elsif ($arg eq "-floatControl") {
+        unless (@ARGV) {
+            die("Please specify a control_string for the floatControl option\n")
+        }
+        $option{converterOption}{floatControl} = lc(shift(@ARGV));
     } elsif (substr($arg, 0, 1) eq '-') {
         push(@unknownOpt, $arg);        # worry about it later...
     } else {
@@ -1195,6 +1459,19 @@ foreach (@unknownOpt) {
         print($help);
         exit(1);
     }
+}
+
+if ($option{converter} eq 'SL') {
+    # set some options especially for Sensei's Library
+    if(exists($option{movesPerDiagram})) {
+        if ($option{movesPerDiagram} > 10) {
+            print "Warning: Sensei's Library won't accept movesPerDiagram greater than 10\n";
+            print "I'll continue, but the output may not be valid\n";
+        }
+    } else {
+        $option{movesPerDiagram} = 10;
+    }
+    $option{newNumbers} = 1;        # turn on newNumbers
 }
 
 unless(exists($option{movesPerDiagram})) {
@@ -1236,7 +1513,10 @@ unless (defined ($outFileName)) {
     $outFileName =~ s/.*\///;   # output into current directory
 }
 # create the root diagram object
-$rootDiagram = $diagram = Games::Go::Diagram->new(callback => \&finishDiagram);
+$rootDiagram = $diagram = Games::Go::Diagram->new(callback    => \&finishDiagram,
+                                                  boardSizeX  => $option{boardSizeX},
+                                                  boardSizeY  => $option{boardSizeY},
+                                                  coord_style => $option{coordStyle});
 $diagram->user({first  => 'first',      # init user hash
                 mainId => 1,
                 id     => $diagramId++});   # id isn't really used for anything,
@@ -1261,11 +1541,8 @@ SGF_ReadFile($inHandle);
 close($inHandle);                       # don't need this anymore
 
 $converter->configure(
-        boardSize    => $option{boardSize},
-        topLine      => $option{topLine},
-        bottomLine   => $option{bottomLine},
-        leftLine     => $option{leftLine},
-        rightLine    => $option{rightLine},
+        boardSizeX   => $option{boardSizeX},
+        boardSizeY   => $option{boardSizeY},
         %{$option{converterOption}}
         );
 # handle the output file
@@ -1305,6 +1582,70 @@ convertDiagram($converter, $rootDiagram, 0);
 $converter->close;
 
 exit(0);
+
+# The auto_bounds method is borrowed (stolen?) from Marcel Gruenauer's 
+#    Dg2SL converter for Sensei's Library (with slight modifications).
+#    We also use this for the VW (view) control property to make sure
+#    our coordinates don't extend past the VieW boundries.
+#
+# set topLine, bottomLine, etc. based on the extent of the current diagram
+
+sub auto_bounds {
+    my ($dg2, $diagram) = @_;
+
+    my $vw = exists($diagram->property()->{0}{VW});
+    if (not $vw and
+        not $option{crop}) {
+        $dg2->configure(leftLine => $option{leftLine},
+                        rightLine => $option{rightLine},
+                        topLine => $option{topLine},
+                        bottomLine => $option{bottomLine});
+        return;
+    }
+    my $left = $option{boardSizeX};
+    my $top = $option{boardSizeY};
+    my $right = my $bottom = 0;
+
+    # Visit each intersection in this diagram to determine the bounds
+    foreach my $y (1 .. $option{boardSizeY}) {
+        foreach my $x (1 ..  $option{boardSizeX}) {
+            my $int = $diagram->get($dg2->diaCoords($x, $y));
+            next unless ($vw ?  exists ($int->{VW}) :
+                                (exists ($int->{black}) or
+                                 exists ($int->{white})));
+            $left   = $x if ($x < $left);
+            $right  = $x if ($x > $right);
+            $top    = $y if ($y < $top);
+            $bottom = $y if ($y > $bottom);
+        }
+    }
+    # Now we have the boundaries of the visible stones.
+
+    # Note: VieW has priority over crop option
+    unless ($vw) { # if ($option{crop}) {
+        # Leave two empty lines on each side.
+        $left -= 2;
+        $right += 2;
+        $top -= 2;
+        $bottom += 2;
+
+        # don't leave out just border lines
+        $left   = 1 if $left <= 2;
+        $right  = $dg2->{boardSizeX} if $right >= $dg2->{boardSizeX} - 1;
+        $top    = 1 if $top <= 2;
+        $bottom = $dg2->{boardSizeY} if $bottom >= $dg2->{boardSizeY} - 1;
+
+        # don't cut off one line away from the border 
+        $left   = $option{leftLine}   unless $left   > 2;
+        $right  = $option{rightLine}  unless $right  < $dg2->{boardSizeX} - 1;
+        $top    = $option{topLine}    unless $top    > 2;
+        $bottom = $option{bottomLine} unless $bottom < $dg2->{boardSizeY} - 1;
+    }
+    $dg2->configure(leftLine => $left,
+                    rightLine => $right,
+                    topLine => $top,
+                    bottomLine => $bottom);
+}
 
 __END__
 

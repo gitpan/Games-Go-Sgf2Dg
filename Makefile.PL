@@ -10,6 +10,26 @@ use Config;
 our $osname = lc($Config{osname});
 our $dos = (($osname eq 'dos') or ($osname eq 'win32'));
 
+my $ver = `svnversion .`;
+# if good, $ver might be one of: qw( 4168 4123:4167 4166M 4165S 4212:4164MS )
+# if svnversion doesn't exist, $ver will be undef.  If there is no .svn info,
+# $ver will be something like "export\n"
+if (defined($ver) and
+    ($ver =~ m/(\d+)\D*(\d*)/)) {
+    my $v;
+    if (($2 eq '') or
+        ($1 > $2)) {
+        $v = $1;
+    } else {        # switched
+        $v = $2;
+    }
+    print "Setting version $v into sgf2dg\n";
+    my $e = 's/(\$Revision:\s*)\d*(\s*\$)/${1}' . $v . '${2}/'; # script
+    system("perl -pi -e '$e' sgf2dg");
+    # print `grep VERSION sgf2dg`;       # verify script worked
+}
+
+
 eval { require PDF::Create; };   # is this module available?
 if ($@) {
     print "\nPDF::Create not available\n",
@@ -41,9 +61,8 @@ if ($@) {
 }
 
 WriteMakefile(
-    NAME                => 'Games::Go::Sgf2Dg',# package name
-    #VERSION_FROM        => 'sgf2dg',           # where to get the package version number from
-    VERSION             => 4.026,
+    NAME                => 'Games::Go::Sgf2Dg', # package name
+    VERSION_FROM        => 'sgf2dg',            # finds $VERSION
     EXE_FILES           => ['sgf2dg',  $dos ? 'sgfsplit.exe' : 'sgfsplit'],
     MAN1PODS            => {sgf2dg      => "\$(INST_MAN1DIR)/sgf2dg.1",
                             'sgfsplit.c' => "\$(INST_MAN1DIR)/sgfsplit.1",},
@@ -87,7 +106,8 @@ sub editTexMakefile {
     die "Can't 'do ./findTEXMF: $!$@\n" unless(defined(do './findTEXMF'));
     my $v;
     eval { $v = getVariables(); };      # try to find TEXMF variables
-    die ("User Abort - TeX fonts and macros will not be installed during 'make install'\n") if ($@);
+    die ("\nUser Abort - TeX fonts and macros will not be installed during 'make install'.\n",
+         "             However, you can still 'make install' for the rest of Sgf2Dg\n\n") if ($@);
     my $texmfRoot ='/usr/share/texmf';
     my $mfdir = "$texmfRoot/fonts/source/public/GOOE";
     my $tfmdir = "$texmfRoot/fonts/tfm/public/GOOE";

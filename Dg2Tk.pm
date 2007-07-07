@@ -1,4 +1,4 @@
-# $Id: Dg2Tk.pm 143 2005-06-03 21:05:57Z reid $
+# $Id: Dg2Tk.pm 171 2007-04-14 04:31:46Z reid $
 
 #   Dg2Tk
 #
@@ -70,7 +70,7 @@ our @EXPORT = qw(
 );
 
 BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 143 $' =~ /(\d+)/;
+    our $VERSION = sprintf "1.%03d", '$Revision: 171 $' =~ /(\d+)/;
 }
 
 ######################################################
@@ -80,7 +80,8 @@ BEGIN {
 #####################################################
 
 our %options = (
-    boardSize       => 19,
+    boardSizeX      => 19,
+    boardSizeY      => 19,
     doubleDigits    => 0,
     coords          => 0,
     topLine         => 1,
@@ -96,7 +97,10 @@ our %options = (
     print           => sub { return; }, # Hmph...
     );
 
-use constant Y_NUMBER_OFFSET => 1;
+use constant TEXT_Y_OFFSET  => 1;
+use constant NORMAL_PEN     => 1;
+use constant BOARD_EDGE_PEN => NORMAL_PEN * 2;
+use constant MARK_PEN       => NORMAL_PEN * 3;
 
 ######################################################
 #
@@ -120,7 +124,8 @@ A B<new> Games::Go::Dg2Tk takes the following options:
 
 =over 4
 
-=item B<boardSize> =E<gt> number
+=item B<boardSizeX> =E<gt> number
+=item B<boardSizeY> =E<gt> number
 
 Sets the size of the board.
 
@@ -166,6 +171,8 @@ Default:
           $x = chr($x - 1 + ord('a')); # convert 1 to 'a', etc
           $y = chr($y - 1 + ord('a'));
           return("$x$y"); },           # concatenate two letters
+
+See also the B<diaCoords> method below.
 
 =back
 
@@ -226,8 +233,24 @@ sub configure {
     # make sure edges of the board don't exceed boardSize
     $my->{topLine}    = 1 if ($my->{topLine} < 1);
     $my->{leftLine}   = 1 if ($my->{leftLine} < 1);
-    $my->{bottomLine} = $my->{boardSize} if ($my->{bottomLine} > $my->{boardSize});
-    $my->{rightLine}  = $my->{boardSize} if ($my->{rightLine} > $my->{boardSize});
+    $my->{rightLine}  = $my->{boardSizeX} if ($my->{rightLine} > $my->{boardSizeX});
+    $my->{bottomLine} = $my->{boardSizeY} if ($my->{bottomLine} > $my->{boardSizeY});
+}
+
+=item my $coord = $dg2mp-E<gt>B<diaCoords> ($x, $y)
+
+Provides access to the B<diaCoords> option (see above).  Returns
+coordinates in the converter's coordinate system for board coordinates ($x,
+$y).  For example, to get a specific intersection structure:
+
+    my $int = $diagram->get($dg2mp->diaCoords(3, 4));
+
+=cut
+
+sub diaCoords {
+    my ($my, $x, $y) = @_;
+
+    return &{$my->{diaCoords}}($x, $y);
 }
 
 =item $dg2tk-E<gt>B<print> ($text ? , ... ?)
@@ -266,78 +289,31 @@ sub printComment {
 }
 
 sub _commentSplit {
-    my ($my, $line) = @_;
+    my ($my, $comment) = @_;
 
     my @massagedLines;
     my $charsPerLine = ($my->{rightEdge} / $my->{fontWidth});
-    $line =~ s/\t/    /g;       # turn all tabs into 4 spaces
-    my $prevIdx = 0;
-    my $prevShortLine = 1;
-    my $length = length($line);
-    while ($prevIdx < $length) {
-        my $break;
-        if ($length <= $prevIdx + $charsPerLine) {
-            $break = $length;
-        } else {
-            $break = rindex($line, ' ', $prevIdx + $charsPerLine); # space nearest next break point
-            $break = $prevIdx + $charsPerLine if ($break < $prevIdx); # no space? force a break anyway
+    my $tab = '';
+    my $line = '';
+    while ($comment ne '') {
+        $comment =~ s/(\s*)(\S*)//m;
+        my $space = defined($1) ? $1 : '';
+        my $token = defined($2) ? $2 : '';
+        defined($token) or $token = '';
+        while ($space =~ s/.*?\n//) {
+            push(@massagedLines, $line);
+            $line = '';
+            $tab = $space;      # space after newlines tabs over following lines
         }
-        my $nIdx = index($line, "\n", $prevIdx);                # first newline
-        my $nnIdx;                                              # second newline
-        if ($nIdx < 0) {                 # no newline?
-            $nnIdx = $nIdx = $length;
-        } else {
-            $nnIdx = index($line, "\n", $nIdx + 1);             # another newline?
-            $nnIdx = $length if ($nnIdx < 0);                   # not found?
+        if (length($line) + length($space) + length($token) > $charsPerLine) {
+            push(@massagedLines, $line);
+            $line = '';
+            $space = $tab;
         }
-        if ($nIdx - $prevIdx == 0) {
-            $prevShortLine = 1;
-            push(@massagedLines, '');
-            $prevIdx++;
-            next;
-        }
-        my $shortLine = ($nnIdx < $break);      # two newlines before break
-        if ($shortLine) {
-            my $l;
-            if ($nIdx == $prevIdx) {            # hmm, undef or ''?  let's be safe
-                $l = '';
-            } else {
-                $l = substr($line, $prevIdx, $nIdx - $prevIdx);
-            }
-            $prevIdx = $nIdx + 1;
-            unless($prevShortLine) {
-                $l .= ' ';
-                while (($prevIdx < $nnIdx) and     # delete spaces at front of next line
-                       (substr($line, $prevIdx, 1) eq ' ')) {
-                    $prevIdx++;
-                }
-                $l .= substr($line, $prevIdx, $nnIdx - $prevIdx);
-                $prevIdx = $nnIdx + 1;
-            }
-            push (@massagedLines, $l);
-        } elsif ($nIdx < $break) {              # one newline before break
-            my $l = substr($line, $prevIdx, $nIdx - $prevIdx);
-            $prevIdx = $nIdx + 1;               # remove the newline
-            $break++;
-            $l .= ' ';
-            while (($prevIdx < $break) and     # delete spaces at front of next line
-                   (substr($line, $prevIdx, 1) eq ' ')) {
-                $prevIdx++;
-            }
-            $l .= substr($line, $prevIdx, $break - $prevIdx);
-            push (@massagedLines, $l);
-            $prevIdx = $break;
-        } else {                                # no newlines before break - force a break
-            push (@massagedLines, substr($line, $prevIdx, $break - $prevIdx));
-            $prevIdx = $break;
-        }
-        while (($prevIdx < $length) and     # delete spaces at front of next line
-               (substr($line, $prevIdx, 1) eq ' ')) {
-            $prevIdx++;
-        }
-        $prevShortLine = $shortLine;
+        $line .= "$space$token";
     }
-    return \@massagedLines;
+    push (@massagedLines, $line) if ($line ne '');
+    return \@massagedLines
 }
 
 =item $dg2tk-E<gt>B<comment> ($comment ? , ... ?)
@@ -408,8 +384,19 @@ sub convertDiagram {
     $my->{textY} += 1 if ($my->{coords});
     $my->{textY} = $my->_boardY($my->{textY}) + $my->{fontHeight};
 
-    $my->convertProperties($diagram->property(0));      # any game-level properties?
-    my $propRef = $diagram->property;                   # get property list for the diagram
+    unless(exists($my->{titleDone})) {      # first diagram only:
+        $my->{titleDone} = 1;
+        my @title_lines = $diagram->gameProps_to_title();
+        my $title = '';
+        foreach (@title_lines) {
+            $title .= "$_\n";
+        }
+        if($title ne '') {
+            $my->printComment("$title\n\n");
+        }
+    }
+    my $propRef = $diagram->property;       # get property list for the diagram
+    $my->{VW} = exists($propRef->{0}{VW});  # view control?
     my $first = $diagram->first_number;
     my $last = $diagram->last_number;
     $my->{offset} = $diagram->offset;
@@ -429,11 +416,7 @@ sub convertDiagram {
         # carp("Hmmm! No numbered moves in $name[0]");
     }
 
-    if (exists($propRef->{0}{N})) {
-        $range .= "\n\n$propRef->{0}{N}";       # node name
-    }
     my ($diaHeight, $diaWidth) = (($my->{bottomLine} - $my->{topLine} + 1), ($my->{rightLine} - $my->{leftLine} + 1));
-    $my->_preamble($diaHeight, $diaWidth);
     if (defined($diagram->var_on_move) and
         defined($diagram->parent)) {
         my $varOnMove = $diagram->var_on_move;
@@ -450,6 +433,7 @@ sub convertDiagram {
 
     # print the diagram title
     $my->printComment(join('', @name, $range, "\n"));
+    # draw the diagram
     foreach my $y ($my->{topLine} .. $my->{bottomLine}) {
         foreach my $x ($my->{leftLine} ..  $my->{rightLine}) {
             $my->_convertIntersection($diagram, $x, $y);
@@ -457,22 +441,33 @@ sub convertDiagram {
         if ($my->{coords}) {    # right-side coords
             $my->{currentBoard}->createText($my->_boardX($my->{rightLine} + 1),
                                             $my->_boardY($y),
-                                            -text => $my->{boardSize} - $y + 1);
+                                            -text => $diagram->ycoord($y));
         }
     }
     # print bottom coordinates
-    $my->_interlude($diaWidth, $diaHeight);
+    if ($my->{coords}) {
+        for ($my->{leftLine} .. $my->{rightLine}) {
+            $my->{currentBoard}->createText($my->_boardX($_),
+                                            $my->_boardY($my->{bottomLine} + 1),
+                                            -text => $diagram->xcoord($_));
+        }
+    }
 
     # deal with the over-lay stones
     $my->_convertOverstones($diagram);
     # print the game comments for this diagram
     foreach my $n (sort { $a <=> $b } keys(%{$propRef})) {
         my @comment;
-        if ((exists($propRef->{$n}{B}) and
-             ($propRef->{$n}{B}[0] eq 'tt')) or
-            (exists($propRef->{$n}{W}) and
-             ($propRef->{$n}{W}[0] eq 'tt'))) {
-            push(@comment, "Pass\n\n");
+        if (exists($propRef->{$n}{B}) and
+            ($propRef->{$n}{B}[0] eq 'pass')) {
+            push(@comment, "Black Pass\n\n");
+        }
+        if (exists($propRef->{$n}{W}) and
+            ($propRef->{$n}{W}[0] eq 'pass')) {
+            push(@comment, "White Pass\n\n");
+        }
+        if (exists($propRef->{$n}{N})) {
+            push(@comment, "$propRef->{$n}{N}[0]\n"); # node name
         }
         if (exists($propRef->{$n}{C})) {
             push(@comment, @{$propRef->{$n}{C}});
@@ -487,7 +482,6 @@ sub convertDiagram {
             $my->printComment($my->convertText("$c\n"));
         }
     }
-    $my->_postamble();
     $my->{bottomEdge} = $my->{textY} + $my->{fontHeight};
     $my->{bottomEdge} += $my->{lineHeight} if ($my->{coords});
     $my->{currentBoard}->configure(-scrollregion => [0, 0, $my->{rightEdge}, $my->{bottomEdge}],);
@@ -519,107 +513,6 @@ sub convertText {
     my ($my, $text) = @_;
 
     return $text;
-}
-
-=item $title = $dg2tk-E<gt>B<convertProperties> (\%sgfHash)
-
-B<convertProperties> takes a reference to a hash of properties as
-extracted from an SGF file.  Each hash key is a property ID and the
-hash value is a reference to an array of property values:
-$hash->{propertyId}->[values].  The following SGF properties are
-recognized:
-
-=over 4
-
-=item GN GameName
-
-=item EV EVent
-
-=item RO ROund
-
-=item PW PlayerWhite
-
-=item WR WhiteRank
-
-=item PB PlayerBlack
-
-=item BR BlackRank
-
-=item DT DaTe
-
-=item PC PlaCe
-
-=item GC GameComment
-
-=item KM KoMi
-
-=item RE REsult
-
-=item TM TiMe
-
-=back
-
-Both long and short property names are recognized, and all
-unrecognized properties are ignored with no warnings.  Note that
-these properties are all intended as game-level notations.
-
-=cut
-
-sub convertProperties {
-    my ($my, $hashRef) = @_;
-
-    return unless(defined($hashRef));
-    my %hash;
-    foreach my $key (keys(%{$hashRef})) {
-        my $short = $key;
-        $short =~ s/[^A-Z]//g;                  # delete everything but upper case letters
-        $hash{$short} = join('', @{$hashRef->{$key}});
-    }
-
-    my @lines;
-    push(@lines, $hash{GN}) if(exists($hash{GN}));      # GameName
-    if (defined($hash{EV})) {
-        if (defined($hash{RO})) {
-            push(@lines, "$hash{EV} - Round $hash{RO}");# EVent name and ROund number
-        } else {
-            push(@lines, $hash{EV});                    # EVent
-        }
-    }
-    if (defined($hash{PW})) {
-        if(defined($hash{WR})) {
-            push(@lines, "White: $hash{PW} $hash{WR}");  # PlayerWhite and WhiteRank
-        } else {
-            push(@lines, "White: $hash{PW}");            # PlayerWhite
-        }
-    }
-    if (defined($hash{PB})) {
-        if(defined($hash{BR})) {
-            push(@lines, "Black: $hash{PB} $hash{BR}");  # PlayerBlack and BlackRank
-        } else {
-            push(@lines, "Black: $hash{PB}");            # PlayerBlack
-        }
-    }
-    push(@lines, $hash{DT}) if (defined($hash{DT}));            # DaTe
-    push(@lines, $hash{PC}) if (defined($hash{PC}));            # PlaCe
-    push(@lines, $hash{GC}) if (defined($hash{GC}));            # GameComment
-    if (defined($hash{KM})) {                                   # komi
-        if ($hash{KM} =~ m/(\d+\.\d+?)0*$/) {
-            # remove ugly trailing zeros supplied by IGS
-            $hash{KM} = $1;
-        }
-        push(@lines, "Komi: $hash{KM}");
-    }
-    push(@lines, "Result: $hash{RE}") if (defined($hash{RE}));   # result
-    push(@lines, "Time: $hash{TM}") if (defined($hash{TM}));     # time constraints
-    my ($title)='';
-    foreach my $line (@lines) {
-        next unless (defined($line));
-        $line =~ s/\\([][)(\\])/$1/g;                           # change escaped chars to non-escaped
-        $title .= "$line\n";
-    }
-    if($title ne '') {
-        $my->printComment("\n$title\n\n");
-    }
 }
 
 =item $dg2tk-E<gt>B<close>
@@ -704,7 +597,7 @@ sub _convertOverstones {
             $otherColor = ($color eq 'black') ? 'white' : 'black';
             $my->{currentBoard}->createText(
                             $x + ($my->{lineWidth} / 2),
-                            $my->{textY} + Y_NUMBER_OFFSET - ($my->{lineHeight} / 2),
+                            $my->{textY} + TEXT_Y_OFFSET - ($my->{lineHeight} / 2),
                             -fill => $otherColor,
                             -text => $number
                             );
@@ -739,29 +632,19 @@ sub _convertOverstones {
             # put the number on it
             $my->{currentBoard}->createText(
                             $x + ($my->{lineWidth} / 2),
-                            $my->{textY} + Y_NUMBER_OFFSET - ($my->{lineHeight} / 2),
+                            $my->{textY} + TEXT_Y_OFFSET - ($my->{lineHeight} / 2),
                             -fill => $otherColor,
                             -text => $my->_checkStoneNumber($int->{number})
                             );
         } elsif (exists($int->{mark})) {
             # draw the mark on it
-            # triangle has top Y; left, right X; and bottom Y
-            my $hCenter = $x + ($my->{lineWidth} / 2);
-            my $top = $my->{textY} - $my->{lineHeight};
-            my $left = $hCenter - (.433 * $my->{lineWidth});         # cos(30) = .866
-            my $right = $hCenter + (.433 * $my->{lineWidth});        # cos(30) = .866
-            my $bottom = $my->{textY} - ($my->{lineHeight} / 4);     # sin(30) = .5
-            $my->{currentBoard}->createLine(
-                               $hCenter, $top,
-                               $right,   $bottom,
-                               $left,    $bottom,
-                               $hCenter, $top,
-                               -fill => $otherColor
-                            );
+            $my->_drawMark($int->{mark}, $otherColor,
+                            ($left + $right) / 2,
+                            ($top + $bottom) / 2);
         } else {
             my $mv = '';
             $mv .= " black node=$int->{black}" if (exists($int->{black}));
-            $mv .= " white node=$int->{white}" if (exists($int->{black}));
+            $mv .= " white node=$int->{white}" if (exists($int->{white}));
             carp("Oops: understone$mv is not numbered or marked? " .
                  "This isn't supposed to be possible!");
         }
@@ -793,86 +676,209 @@ sub _checkStoneNumber {
 sub _convertIntersection {
     my ($my, $diagram, $x, $y) = @_;
 
-    my $int = $diagram->get(&{$my->{diaCoords}}($x, $y));
-    my ($stone, $color, $otherColor);
+    my $int = $diagram->get($my->diaCoords($x, $y));
+    return if ($my->{VW} and            # view control AND
+               not exists($int->{VW})); # no view on this intersection
+    my ($stone, $label, $color, $otherColor);
     if (exists($int->{black})) {
         $color = 'black';
         $otherColor = 'white';
-    }elsif (exists($int->{white})) {
+        $stone = 1;
+    } elsif (exists($int->{white})) {
         $color = 'white';
         $otherColor = 'black';
+        $stone = 1;
+    } else {
+        $color = 'black';
+        $otherColor = 'black';
+        $stone = 0;
+        $my->_draw_underneath($int, $x, $y);
     }
     if (exists($int->{number})) {
-        $stone = $my->_checkStoneNumber($int->{number}); # numbered stone
-    } elsif (exists($int->{mark})) {
-        $stone = 'mark';                        # marked stone
-        unless(defined($color)) {
-            carp("Can't mark empty intersction");
-        }
+        $label = $my->_checkStoneNumber($int->{number}); # numbered stone
     } elsif (exists($int->{label})) {
-        $stone = $int->{label};             # labeled stone or intersection
+        $label = $int->{label};             # labeled stone or intersection
     }
 
-    if (defined($color)) {
-        my $left = $my->_boardX($x) - $my->{lineWidth} / 2;
-        my $right = $left + $my->{lineWidth};
-        my $top = $my->_boardY($y) - $my->{lineHeight} / 2;
-        my $bottom = $top + $my->{lineHeight};
-        $my->{currentBoard}->createOval($left, $top, $right, $bottom,
+    my $xx = $my->_boardX($x);
+    my $yy = $my->_boardY($y);
+    if ($stone) {
+        $my->{currentBoard}->createOval(
+            $xx - $my->{lineWidth} / 2,     # left
+            $yy - $my->{lineHeight} / 2,    # top
+            $xx + $my->{lineWidth} / 2,     # right
+            $yy + $my->{lineHeight} / 2,    # bottom
             -fill => $color,
             );
+    } elsif (defined($label)) {
+        # create some whitespace to draw label on
+        $my->{currentBoard}->createOval(
+            $xx - $my->{lineWidth} / 3,     # left
+            $yy - $my->{lineHeight} / 3,    # top
+            $xx + $my->{lineWidth} / 3,     # right
+            $yy + $my->{lineHeight} / 3,    # bottom
+            -fill    => $my->{canvas_bg},
+            -outline => undef,
+            -tags    => ['bg']);
+    }
+    if (defined($label)) {
+        $my->{currentBoard}->createText(
+            $xx,
+            $yy + TEXT_Y_OFFSET,
+            -fill => $otherColor,
+            -text => $label
+            );
+    }
+    if (exists($int->{mark})) {
+        $my->_drawMark($int->{mark}, $otherColor, $xx, $yy);
+    }
+}
 
-        if (defined($stone)) {
-            if ($stone eq 'mark') {
-                $my->_drawMark($otherColor, $x, $y);
-            } else {
-                $my->{currentBoard}->createText(
-                    $my->_boardX($x),
-                    $my->_boardY($y) + Y_NUMBER_OFFSET,
-                    -fill => $otherColor,
-                    -text => $stone
-                    );
-            }
+sub _draw_left {
+    my ($my, $width, $x, $y) = @_;
+    $my->{currentBoard}->createLine(
+            $x + 1,
+            $y,
+            $x - ($my->{lineWidth} / 2) - 1,
+            $y,
+            -width => $width);
+}
+
+sub _draw_right {
+    my ($my, $width, $x, $y) = @_;
+    $my->{currentBoard}->createLine(
+            $x - 1,
+            $y,
+            $x + ($my->{lineWidth} / 2) + 1,
+            $y,
+            -width => $width);
+}
+
+sub _draw_up {
+    my ($my, $width, $x, $y) = @_;
+    $my->{currentBoard}->createLine(
+            $x,
+            $y + 1,
+            $x,
+            $y - ($my->{lineWidth} / 2) - 1,
+            -width => $width);
+}
+
+sub _draw_down {
+    my ($my, $width, $x, $y) = @_;
+    $my->{currentBoard}->createLine(
+            $x,
+            $y - 1,
+            $x,
+            $y + ($my->{lineWidth} / 2) + 1,
+            -width => $width);
+}
+
+sub _draw_underneath {
+    my ($my, $int, $xx, $yy) = @_;
+
+    my $x = $my->_boardX($xx);
+    my $y = $my->_boardY($yy);
+    if ($yy <= 1) {
+        if ($xx <= 1) {                     # upper left corner
+            $my->_draw_right(BOARD_EDGE_PEN, $x, $y);
+            $my->_draw_down(BOARD_EDGE_PEN, $x, $y);
+        } elsif ($xx >= $my->{boardSizeX}) {# upper right corner
+            $my->_draw_left(BOARD_EDGE_PEN, $x, $y);
+            $my->_draw_down(BOARD_EDGE_PEN, $x, $y);
+        } else {                            # upper side
+            $my->_draw_left(BOARD_EDGE_PEN, $x, $y);
+            $my->_draw_right(BOARD_EDGE_PEN, $x, $y);
+            $my->_draw_down(NORMAL_PEN, $x, $y);
+        }
+    } elsif ($yy >= $my->{boardSizeY}) {
+        if ($xx <= 1) {                     # lower left corner
+            $my->_draw_right(BOARD_EDGE_PEN, $x, $y);
+            $my->_draw_up(BOARD_EDGE_PEN, $x, $y);
+        } elsif ($xx >= $my->{boardSizeX}) {# lower right corner
+            $my->_draw_left(BOARD_EDGE_PEN, $x, $y);
+            $my->_draw_up(BOARD_EDGE_PEN, $x, $y);
+        } else {                            # lower side
+            $my->_draw_left(BOARD_EDGE_PEN, $x, $y);
+            $my->_draw_right(BOARD_EDGE_PEN, $x, $y);
+            $my->_draw_up(NORMAL_PEN, $x, $y);
         }
     } else {
-        if (exists($int->{hoshi})) {
-            $my->_drawHoshi($x, $y);
+        if ($xx <= 1) {                     # left side
+            $my->_draw_up(BOARD_EDGE_PEN, $x, $y);
+            $my->_draw_down(BOARD_EDGE_PEN, $x, $y);
+            $my->_draw_right(NORMAL_PEN, $x, $y);
+        } elsif ($xx >= $my->{boardSizeX}) {# right side
+            $my->_draw_up(BOARD_EDGE_PEN, $x, $y);
+            $my->_draw_down(BOARD_EDGE_PEN, $x, $y);
+            $my->_draw_left(NORMAL_PEN, $x, $y);
+        } else {                            # somewhere in the middle
+            $my->_draw_up(NORMAL_PEN, $x, $y);
+            $my->_draw_down(NORMAL_PEN, $x, $y);
+            $my->_draw_left(NORMAL_PEN, $x, $y);
+            $my->_draw_right(NORMAL_PEN, $x, $y);
         }
-        if (defined($stone)) {
-            # create some whitespace to draw label on
-            my $left = $my->_boardX($x) - $my->{lineWidth} / 3;
-            my $right = $left + $my->{lineWidth} / 1.5;
-            my $top = $my->_boardY($y) - $my->{lineHeight} / 3;
-            my $bottom = $top + $my->{lineHeight} / 1.5;
-            $my->{currentBoard}->createOval(
-                $left, $top, $right, $bottom,
-                -fill    => $my->{canvas_bg},
-                -outline => undef,
-                -tags    => ['bg']);
-            $my->{currentBoard}->createText(
-                $my->_boardX($x),
-                $my->_boardY($y) + Y_NUMBER_OFFSET,
-                -text => $stone);
-        }
+    }
+    if (exists($int->{hoshi})) {
+        $my->_drawHoshi($x, $y);
     }
 }
 
 sub _drawMark {
-    my ($my, $color, $x, $y) = @_;
+    my ($my, $mark, $color, $x, $y) = @_;
 
-    # triangle has top Y; left, right X; and bottom Y
-    my $hCenter = $my->_boardX($x);
-    my $top = $my->_boardY($y) + Y_NUMBER_OFFSET - ($my->{lineHeight} / 2);
-    my $left = $hCenter - (.433 * $my->{lineWidth});         # cos(30) = .866
-    my $right = $hCenter + (.433 * $my->{lineWidth});        # cos(30) = .866
-    my $bottom = $my->_boardY($y) + Y_NUMBER_OFFSET + ($my->{lineHeight} / 4); # sin(30) = .5
-    $my->{currentBoard}->createLine(
-                       $hCenter, $top,
-                       $right,   $bottom,
-                       $left,    $bottom,
-                       $hCenter, $top,
-                       -fill => $color
-                    );
+    if ($mark eq 'TR') {        # TR[pt]      triangle
+        # triangle has top Y; left, right X; and bottom Y
+        my $left   = $x - (.3 * $my->{lineWidth});    # cos(30) = .866
+        my $right  = $x + (.3 * $my->{lineWidth});    # cos(30) = .866
+        my $top    = $y - ($my->{lineHeight} / 3);
+        my $bottom = $y + ($my->{lineHeight} / 6);      # sin(30) = .5
+        $my->{currentBoard}->createLine(
+                           $x,     $top,
+                           $right, $bottom,
+                           $left,  $bottom,
+                           $x,     $top,
+                           -fill => $color,
+                           -width => MARK_PEN
+                        );
+    } else {
+        # circle, square, and X mark is centered at X, Y, 50% of usual stone size
+        my $left   = $x - (.25 * $my->{lineWidth});
+        my $right  = $x + (.25 * $my->{lineWidth});
+        my $top    = $y - (.25 * $my->{lineHeight});
+        my $bottom = $y + (.25 * $my->{lineHeight});
+        if ($mark eq 'CR') {   # CR[pt]      circle
+            $my->{currentBoard}->createOval(
+                               $left,  $top,
+                               $right, $bottom,
+                               -outline => $color,
+                               -width => MARK_PEN
+                            );
+        } elsif ($mark eq 'SQ') {   # SQ[pt]      square
+            $my->{currentBoard}->createLine(
+                               $left,  $top,
+                               $right, $top,
+                               $right, $bottom,
+                               $left,  $bottom,
+                               $left,  $top - 1,
+                               -fill => $color,
+                               -width => MARK_PEN
+                            );
+        } else {                    # MA[pt]      mark (X)
+            $my->{currentBoard}->createLine(
+                               $left,  $top,
+                               $right, $bottom,
+                               -fill => $color,
+                               -width => MARK_PEN
+                            );
+            $my->{currentBoard}->createLine(
+                               $right, $top,
+                               $left,  $bottom,
+                               -fill => $color,
+                               -width => MARK_PEN
+                            );
+        }
+    }
 }
 
 sub _drawHoshi {
@@ -880,58 +886,13 @@ sub _drawHoshi {
 
     my $size = ($my->{lineWidth} * 0.05);   # 10% size of a stone
     $size = 1 if $size <= 0;
-    my $left = $my->_boardX($x) - $size;
+    my $left = $x - $size;
     my $right = $left + 2 * $size;
-    my $top = $my->_boardY($y) - $size;
+    my $top = $y - $size;
     my $bottom = $top + 2 * $size;
     $my->{currentBoard}->createOval($left, $top, $right, $bottom,
                     -fill => 'black'
                     );
-}
-
-# use preamble to build the empty board
-sub _preamble {
-    my ($my, $diaHeight, $diaWidth) = @_;
-
-    # vertical lines
-    my $top = $my->_boardY($my->{topLine});
-    $top -= $my->{lineHeight} / 2 unless($my->{topLine} <= 1);
-    my $bot = $my->_boardY($my->{bottomLine});
-    $bot += $my->{lineHeight} / 2 unless($my->{bottomLine} >= $my->{boardSize});
-    for (my $x = $my->{leftLine}; $x <= $my->{rightLine}; $x++) {
-        my $cx = $my->_boardX($x);
-        $my->{currentBoard}->createLine($cx, $top, $cx, $bot);
-    }
-    # horizontal lines
-    my $left = $my->_boardX($my->{leftLine});
-    $left -= $my->{lineWidth} / 2 unless($my->{leftLine} <= 1);
-    my $right = $my->_boardX($my->{rightLine});
-    $right += $my->{lineWidth} / 2 unless($my->{rightLine} >= $my->{boardSize});
-    my $cy;
-    for (my $y = $my->{topLine}; $y <= $my->{bottomLine}; $y++) {
-        $cy = $my->_boardY($y);
-        $my->{currentBoard}->createLine($left, $cy, $right, $cy);
-    }
-    return unless ($my->{coords});
-    $cy += $my->{lineHeight};
-    for (my $x = $my->{leftLine}; $x <= $my->{rightLine}; $x++) {
-        my $coord = (qw(A B C D E F G H J K L M N O P Q R S T U V W X Y Z))[$x - 1];
-        next unless(defined($coord));
-        $my->{currentBoard}->createText($my->_boardX($x), $cy,
-                                 -text => $coord);
-    }
-}
-
-# nothing to do for Tk _interlude
-sub _interlude {
-    my ($my, $diaWidth, $diaHeight) = @_;
-
-}
-
-# this one's pretty easy too
-sub _postamble {
-    my ($my) = @_;
-
 }
 
 sub _boardX {

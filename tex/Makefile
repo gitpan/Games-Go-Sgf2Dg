@@ -1,4 +1,4 @@
-# $Id: Makefile 35 2005-01-22 02:36:46Z reid $
+# $Id: Makefile 191 2007-06-02 15:31:50Z reid $
 #
 #       Makefile for sgf2tex/tex subdirectory.  This Makefile installs the TeX
 #       portions of the sgf2tex distribution: the GOOE fonts, font metrics,
@@ -42,7 +42,7 @@ INSTALL = install -m 0644
 # If you make certain types of modifications to the fonts, the .tfm files
 # might change.  If you are getting checksum errors, you should delete any
 # cached .tfm files. Most font modifications you are likely to make to the
-# sgf2tex fonts are not likely to change the .tfm files.
+# GOOE fonts are not likely to change the .tfm files.
 #
 
 .SUFFIXES : .mf .tfm .300pk .360pk .432pk .600pk .720pk .864pk .300gf .360gf .432gf .600gf .720gf .864gf
@@ -72,6 +72,8 @@ FONTS = gooa.300gf gooa.360gf gooa.432gf gooa.600gf gooa.720gf gooa.864gf \
 
 # when called as 'make' or 'make all', we don't want anything to happen:
 make: all
+
+all:
 
 # After installing fonts, we need to run MakeTeXls-R for WEB2C Unix
 # distribution, or texhash for TETEX, or nothing for NTEX.  Since we don't
@@ -116,22 +118,22 @@ fonts: $(FONTS)
 	mf "\mode=ljfour; mag=1.44; input $*"
 
 .300gf.300pk :
-	gftopk gooegb.300gf
+	gftopk $*.300gf
 
 .360gf.360pk :
-	gftopk gooegb.360gf
+	gftopk $*.360gf
 
 .432gf.432pk :
-	gftopk gooegb.432gf
+	gftopk $*.432gf
 
 .600gf.600pk :
-	gftopk gooegb.600gf
+	gftopk $*.600gf
 
 .720gf.720pk :
-	gftopk gooegb.720gf
+	gftopk $*.720gf
 
 .864gf.864pk :
-	gftopk gooegb.864gf
+	gftopk $*.864gf
 
 .300pk.tfm :
 

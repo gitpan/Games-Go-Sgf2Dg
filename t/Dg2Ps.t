@@ -13,7 +13,7 @@ if ($@) {
     plan(skip_all => "postScript::File not installed: $@");
 }
 
-plan (tests => 9);
+plan (tests => 8);
 
 use_ok('Games::Go::Dg2Ps');
 use_ok('Games::Go::Diagram');
@@ -45,18 +45,12 @@ eval { $dg2ps = Games::Go::Dg2Ps->new(
 is( $@, '',                                     'new Dg2Ps object'  );
 isa_ok( $dg2ps, 'Games::Go::Dg2Ps',           '   dg2ps is the right class'  );
 
-$dg2ps->configure(boardSize => 5);
+$dg2ps->configure(boardSizeX => 5, boardSizeY => 5);
 $dg2ps->convertDiagram($diagram);
 eval {$dg2ps->comment(' comment')};
 is( $@, '',                                     'added comment' );
 $dg2ps->comment(' and more comment');
 is( $@, '',                                     'raw print' );
-$dg2ps->convertProperties({GN => ['GameName'],
-                            EV => ['EVent'],
-                            RO => ['ROund'],
-                            PW => ['PlayerWhite'],
-                            WR => ['WhiteRank'],
-                            C  => ['PlayerBlack', 'is not here']});
 
 # since we rely on PostScript::File (which could change), we don't want
 # to make our tests too specific.  But if the other converters pass,
@@ -64,7 +58,6 @@ $dg2ps->convertProperties({GN => ['GameName'],
 
 my $ps = $dg2ps->close;
 like($ps, qr/My_Functions/,                     'has a My_Functions' );
-like($ps, qr/GameName/,                         'converted properties' );
 like($ps, qr/showpage/,                         'has a showpage' );
 ##
 ## end of tests

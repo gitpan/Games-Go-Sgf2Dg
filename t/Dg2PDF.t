@@ -46,18 +46,12 @@ eval { $dg2pdf = Games::Go::Dg2PDF->new(
 is( $@, '',                                     'new Dg2PDF object'  );
 isa_ok( $dg2pdf, 'Games::Go::Dg2PDF',           '   dg2pdf is the right class'  );
 
-$dg2pdf->configure(boardSize => 5);
+$dg2pdf->configure(boardSizeX => 5, boardSizeY => 5);
 $dg2pdf->convertDiagram($diagram);
 eval {$dg2pdf->comment(' comment')};
 is( $@, '',                                     'added comment' );
 $dg2pdf->comment(' and more comment');
 is( $@, '',                                     'raw print' );
-$dg2pdf->convertProperties({GN => ['GameName'],
-                            EV => ['EVent'],
-                            RO => ['ROund'],
-                            PW => ['PlayerWhite'],
-                            WR => ['WhiteRank'],
-                            C  => ['PlayerBlack', 'is not here']});
 
 # since we rely on PDF::Create (which could change), we don't want
 # to make our tests too specific.  But if the other converters pass,

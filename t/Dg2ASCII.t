@@ -7,7 +7,7 @@
 
 use strict;
 use IO::File;
-use Test::More tests => 17;
+use Test::More tests => 16;
 
 BEGIN {
     use_ok('Games::Go::Dg2ASCII');
@@ -50,31 +50,20 @@ is( $dg2ascii->converted, " comment
 raw print
 ",                                              'converted text is good' );
 is( $dg2ascii->converted(''), '',               'converted text cleared' );
-$dg2ascii->convertProperties({GN => ['GameName'],
-                            EV => ['EVent'],
-                            RO => ['ROund'],
-                            PW => ['PlayerWhite'],
-                            WR => ['WhiteRank'],
-                            C  => ['PlayerBlack', 'is not here']});
-is($dg2ascii->converted, 
-"
-GameName
-EVent - Round ROund
-White: PlayerWhite WhiteRank
-
-",                                              'convertProperties');
 
 my $diagram;
 eval { $diagram = Games::Go::Diagram->new(
                     hoshi             => ['ba', 'cd'],
                     black             => ['ab'],
                     white             => ['dd', 'cd'],
+                    boardSizeX        => 5,
+                    boardSizeY        => 5,
                     callback          => \&conflictCallback,
                     enable_overstones => 1,
                     overstone_eq_mark => 1); };
 die "Can't create diagram: $@" if $@;
 
-eval { $dg2ascii->configure( boardSize => 5,); };
+eval { $dg2ascii->configure( boardSizeX => 5, boardSizeY => 5,); };
 is( $@, '',                                     'reconfigured Dg2ASCII object' );
 is( $dg2ascii->converted(''), '',               'converted text cleared' );
 eval { $dg2ascii->convertDiagram( $diagram); };
@@ -83,6 +72,7 @@ is ($dg2ascii->converted,
 '
 Black -> X   Marked black -> #   Labeled black -> Xa, Xb
 White -> O   Marked white -> @   Labeled white -> Oa, Ob
+             Marked empty -> ?   Labeled empty ->  a,  b
 Unknown Diagram
  +-- *  ---------+  5
  |               |  
@@ -93,8 +83,7 @@ Unknown Diagram
  |   +   O   O   |  2
  |               |  
  +---------------+  1
- A   B   C   D   E
-
+ A   B   C   D   E   
 
 
 ',                                             '    text is correct' );

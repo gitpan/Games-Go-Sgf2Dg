@@ -1,4 +1,4 @@
-# $Id: Diagram.pm 143 2005-06-03 21:05:57Z reid $
+# $Id: Diagram.pm 200 2007-06-11 00:38:00Z reid $
 
 #   Diagram
 #
@@ -34,16 +34,18 @@ Games::Go::Diagram - Perl extension to make go diagrams similar to printed diagr
 =head1 DESCRIPTION
 
 A Games::Go::Diagram object represents a diagram similar to those
-seen in go textbooks and magazines.  The caller B<put>s 'white' or
-'black' stones (possibly B<number>ed), on the intersection selected
-by $coords.  The caller may also B<mark> and B<label> intersections
-and stones.
+seen in go textbooks and magazines.  Most of the properties defined in SGF
+FF[4] are supported.
 
-B<put>ting, B<mark>ing, B<label>ing and B<property>ing are 'actions'.
-Actions are provisional until the B<node> method is called.  If any
-provisioanl actions cause a conflict, none of the actions associated
-with the node are applied, and the B<node> method either calls a
-user-defined callback function, or returns an error.
+The caller B<put>s 'white' or 'black' stones (possibly B<number>ed), on the
+intersection selected by $coords.  The caller may B<mark> and B<label>
+intersections and stones.
+
+B<put>, B<mark>, B<label> and B<property> are 'actions'.  Actions are
+provisional until the B<node> method is called.  If any provisioanl actions
+cause a conflict, none of the actions associated with the node are applied,
+and the B<node> method either calls a user-defined callback function, or
+returns an error.
 
 When a conflict occurs, the caller should dispose of the current
 B<Diagram> by B<get>ting the information from each intersection and
@@ -88,9 +90,11 @@ our @EXPORT = qw(
 );
 
 BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 143 $' =~ /(\d+)/;
+    our $VERSION = sprintf "1.%03d", '$Revision: 200 $' =~ /(\d+)/;
 }
 
+# Constants
+use constant DEFAULT_MARK => 'TR';      # TRiangle mark property
 ######################################################
 #
 #       Class Variables
@@ -104,6 +108,9 @@ BEGIN {
 our %options = (hoshi             => [],
                 black             => [],
                 white             => [],
+                coord_style       => 'normal',
+                boardSizeX        => 19,
+                boardSizeY        => 19,
                 node              => 1,
                 callback          => undef,
                 enable_overstones => 1,
@@ -117,7 +124,7 @@ our %options = (hoshi             => [],
 
 =head1 METHODS
 
-=over
+=over 4
 
 =item my $diagram = Games::Go::Diagram-E<gt>B<new> (?options?)
 
@@ -125,7 +132,7 @@ A B<new> Games::Go::Diagram can take the following options:
 
 Options:
 
-=over
+=over 4
 
 =item B<hoshi> =E<gt> ['coords', ...]
 
@@ -141,6 +148,46 @@ with black stones already in place.
 
 A reference to a list of coordinates where the Diagram should start
 with white stones already in place.
+
+=item B<coord_style> =E<gt> 'normal' | 'sgf' | numeric
+
+Defines the coordinate translation system.  Note that while
+B<Games::Go::Diagram> doesn't use this coordinate system directly, sgf2dg
+converters may call the coordinate translator methods B<xcoord> and
+B<ycoord>, which rely on B<coord_style> and B<boardSizeX/Y> (below).
+
+Legal values are:
+
+=over 4
+
+=item 'normal'
+
+This is the standard coordinate system used for drawing diagrams: the
+vertical coordinates start with 1 at the bottom and increase towards the
+top edge.  The horizontal coordinates are letters starting with A on the
+left, and increasing towards the right, but skipping over 'I'.  This is the
+default coordinate style.
+
+=item 'sgf'
+
+Coordinates within SGF files are single letters, lower case first, then
+upper case.  The origin (aa) is the top left corner.  'A' follows 'z', so
+the point at (26, 27) translates to (zA).
+
+=item numeric: '++' | '+-' | '-+' | '--'
+
+Number coordinates can be either increasing or decreasing.  '++' starts
+with (0, 0) in the upper left corner, '-+' has (0, 0) in the upper right
+corner, etc.
+
+=back
+
+=item B<boardSizeX> =E<gt> number
+
+=item B<boardSizeY> =E<gt> number
+
+B<boardSizeX/Y> are used by the coordinate translation methods (B<xcoord>
+and B<ycoord> to calculate the appropriate coordinate string.
 
 =item B<callback> =E<gt> \&user_defined_callback
 
@@ -161,13 +208,6 @@ If true (default), overstones are enabled and may be created by
 the B<Diagram> during a call to the B<put> method.  The user must be
 prepared to deal with overstones information in response to a
 call to the B<get> method.
-
-=item B<overstone_eq_mark> =E<gt> true | false
-
-If true (default), overstones are assumed to be indistinguishable
-from B<mark>s which means there can be conflicts between B<mark>s
-and overstones.  If false, B<marks> and overstones are assumed
-to use different symbols and there are no conflicts between them.
 
 =back
 
@@ -195,13 +235,16 @@ sub new {
         my $coordList =  delete($my->{$type});
         for (my $ii = 0; $ii < @{$coordList}; $ii++) {
             $my->{board}{$coordList->[$ii]}{$type} = $my->{node};
+            $my->{board}{$coordList->[$ii]}{color} = $type;
             if (($type eq 'white') and
                 exists($my->{board}{$coordList->[$ii]}{black})) {
                 carp("Black and white on the same intersection (at $coordList->[$ii]");
             }
         }
     }
+    $my->{coord_style} = 'normal' unless (defined($my->{coord_style}));
     $my->{actions} = [];        # no actions yet
+    $my->{actions_done} = 0;    # no actions done yet
     $my->{provisional} = 1;     # make all actions provisional
     return($my);
 }
@@ -217,7 +260,7 @@ the B<clear>ed B<Diagram>.
 
 The following options are preserved:
 
-=over
+=over 4
 
 =item *
 
@@ -231,13 +274,7 @@ callback
 
 enable_overstones
 
-=item *
-
-overstone_eq_mark
-
 =back
-
-Z<>
 
 =cut
 
@@ -256,7 +293,7 @@ sub clear {
     foreach my $coords (keys(%{$my->{board}})) {
         my $int = $my->{board}{$coords};   # intersection
         $new_board{$coords}{hoshi} = $int->{hoshi} if(exists($int->{hoshi}));
-        my $stone = $my->_game_stone_int($int);
+        my $stone = $my->game_stone($int);
         $new_board{$coords}{$stone} = 0 if (defined($stone));
     }
     delete($my->{board});
@@ -268,8 +305,49 @@ sub clear {
     }
     $my->{node}++;
     $my->{actions} = [];        # no actions yet
+    $my->{actions_done} = 0;    # no actions done yet
     $my->{provisional} = 1;     # make all actions provisional
     return $my;
+}
+
+=item $diagram-E<gt>B<force_conflict(? $msg ?)>
+
+Set the conflict flag to force pending actions to be flushed and a new
+$diagram created.  It's a good idea to pass a short $msg explaining the
+conflict is being created.  $msg is printed in -verbose mode of sgf2dg.  If
+no $msg is defined, a generic (and probably not very helpful) message is
+produced.
+
+=cut
+
+sub force_conflict {
+    my ($my, $msg) = @_;
+
+    $my->{conflict} = defined($msg) ? $msg : 'forced conflict';
+}
+
+=item my $pending_count = $diagram-E<gt>B<actions_pending>
+
+Returns the number of actions that would be executed if B<node> were called.
+
+=cut
+
+sub actions_pending {
+    my ($my) = @_;
+
+    return (scalar(@{$my->{actions}}));
+}
+
+=item my $done_count = $diagram-E<gt>B<actions_done>
+
+Returns the number of actions that have been done for the current $diagram.
+
+=cut
+
+sub actions_done {
+    my ($my) = @_;
+
+    return ($my->{actions_done});
 }
 
 =item my $nextDiagram = $diagram-E<gt>B<next>
@@ -284,7 +362,7 @@ applied due to conflicts are now applied to the B<next> B<Diagram>.
 
 The following options are preserved:
 
-=over
+=over 4
 
 =item *
 
@@ -300,11 +378,7 @@ enable_overstones
 
 =item *
 
-overstone_eq_mark
-
 =back
-
-Z<>
 
 =cut
 
@@ -318,7 +392,7 @@ sub next {
         if (exists($int->{hoshi})) {
             push(@hoshi, $coords);
         }
-        my $stone = $my->_game_stone_int($int);
+        my $stone = $my->game_stone($int);
         next unless(defined($stone));
         push(@white, $coords) if($stone eq 'white');
         push(@black, $coords) if($stone eq 'black');
@@ -383,7 +457,7 @@ current B<Diagram>, and call B<next> (to generate a new B<Diagram>).
 If there is a conflict and no user B<callback> is defined, B<node>
 returns 0.  The user should either:
 
-=over
+=over 4
 
 =item *
 
@@ -394,8 +468,6 @@ to continue working with the current B<Diagram>, or:
 
 save the current B<Diagram> (and call $diagram-E<gt>B<next> to
 create a new B<Diagram> to continue working with)
-
-Z<>
 
 =back
 
@@ -412,7 +484,8 @@ sub node {
     if ($my->{conflict}) {
         if (exists($my->{callback})) {
 # print "calling callback\n";
-            &{$my->{callback}}($my);
+            &{$my->{callback}}($my, $my->{conflict});
+            delete($my->{conflict});
             return $my->{node};
         }
         return 0;               # conflict: user needs to do something
@@ -421,6 +494,7 @@ sub node {
     foreach(@{$my->{actions}}) {
         &{$_}($my);             # call the closures
     }
+    $my->{actions_done} += @{$my->{actions}};
     $my->{actions} = [];        # clear actions list
     $my->{provisional} = 1;     # make all actions provisional
     return ++$my->{node};
@@ -436,7 +510,7 @@ except at the very start of a B<Diagram>.
 
 B<put>ting can cause any of the following conflicts:
 
-=over
+=over 4
 
 =item *
 
@@ -445,8 +519,6 @@ stone is numbered and number is already used
 =item *
 
 stone is numbered and the intersection is already labeled
-
-Z<>
 
 =back
 
@@ -458,8 +530,8 @@ B<Diagram>.  There are two kinds of overstones: normal and
 B<mark>ed, depending on the state of the underlying (B<capture>d but
 not yet removed) stone.
 
-If the underlying stone is B<number>ed or B<label>ed, the overstone
-is normal and there will be no conflicts (unless the number is
+If the underlying stone is B<number>ed, B>mark>ed or B<label>ed, the
+overstone is normal and there will be no conflicts (unless the number is
 already used!).
 
 If the underlying stone is un-B<number>ed and un-B<label>ed, the
@@ -469,7 +541,7 @@ and there is no conflict.
 
 The conversion of the underlying stone causes a conflict if:
 
-=over
+=over 4
 
 =item *
 
@@ -478,8 +550,8 @@ been converted elsewhere in the B<Diagram>, or
 
 =item *
 
-B<overstone_eq_mark> is true and a mark of the same color as
-the underlying stone exists elsewhere in the B<Diagram>.
+a mark of the same color as the underlying stone exists elsewhere in the
+B<Diagram>.
 
 =back
 
@@ -514,7 +586,7 @@ sub put {
         } else {
             $err .= '(numberless)';
         }
-        carp("can't 'put' a stone on top of a stone$num_msg: $err");
+        carp("can't 'put' a stone on top of a stone: $err");
         return 0;
     }
     if ($my->{provisional}) {
@@ -524,12 +596,12 @@ sub put {
                          exists($int->{black}));        #   make an overstone
     if ($makeOverStone) {
         $my->_overstone($coords, $color, $num)
-    } elsif (exists($int->{mark}) or            # not supposed to be marks on empty anyway
-             (defined($num) and                 # new stone is numbered?
+    } elsif ((defined($num) and                 # new stone is numbered?
               (exists($my->{number}{$num}) or   # already used number?
+               exists($int->{mark}) or          # mark already here?
                exists($int->{label})))) {       # label already here?
 # print "put conflict $color$num_msg\n";
-        $my->{conflict} = 1;
+        $my->{conflict} = 'put: number, mark or label conflict';
         return 0;
     }
     unless ($my->{provisional}) {
@@ -538,52 +610,52 @@ sub put {
             $my->{number}{$num} = $my->{node};
         }
         delete($int->{capture});
-        $int->{$color} = $my->{node} unless ($makeOverStone);
+        unless ($makeOverStone) {
+            $int->{$color} = $my->{node};
+            $int->{color} = $color;
+        }
     }
     return $my->{node};
 }
 
+# convert $color move $num to overstone, and use stone at $coords as its
+# understone (mark it if necessary)
 sub _overstone {
     my ($my, $coords, $color, $num) = @_;
 
-    unless(defined($num)) {     # overstones must be numbered
+    unless($my->{enable_overstones} and     # must be enabled,
+           defined($num)) {                 # overstones must be numbered
 # print "overstone 0 conflict $color\n";
-        $my->{conflict} = 1;
+        $my->{conflict} = 'overstone: number not defined';
         return 0;
     }
     my $int = $my->{board}{$coords};
     my $underColor = exists($int->{black}) ? 'black' : 'white';
     if (exists($int->{number}) or
         exists($int->{label})) {
-        # OK, no conflict
-    } else {
-        # understone isn't numbered/labeled,
-        # can we convert it to a marked stone?
-        if (exists($my->{marked_overstone}{$underColor})) {
-            if ($my->{marked_overstone}{$underColor} ne $coords) {
-# print "overstone 1 conflict $color $num\n";
-                $my->{conflict} = 1;
-                return 0;
-            } # else this intersection is already marked
-        } elsif ($my->{overstone_eq_mark} and
-                 exists($my->{mark}{$underColor})) {
-# print "overstone 2 conflict $color $num\n";
-            $my->{conflict} = 1;
+        # we can use the number/label for referencing the understone
+    } elsif (exists($int->{mark})) {        # intersection already marked?
+        # if there is exactly one mark of this type and color, we can use
+        #   it.  otherwise, it's a conflict
+        if (exists ($my->{mark_count}{$int->{mark}}) and
+            exists ($my->{mark_count}{$int->{mark}}{$int->{color}}) and
+            ($my->{mark_count}{$int->{mark}}{$int->{color}} != 1)) {
+# print "overstone conflict $color $num\n";
+            $my->{conflict} = 'overstone: mark conflict';
             return 0;
         }
+    } else {
+        # understone isn't numbered, labeled, or marked.
+        # convert it to a marked stone
         unless($my->{provisional}) {
-            if ($my->{overstone_eq_mark}) {
-                $int->{mark} = $my->{node};
-            } else {
-                $int->{overstone} = $my->{node};
-            }
-            $my->{marked_overstone}{$underColor} = $coords;
-            $my->{mark}{$underColor} = $my->{node} if ($my->{overstone_eq_mark});
+            $int->{mark} = DEFAULT_MARK;
+            $my->{mark}{DEFAULT_MARK}{$underColor} = $my->{node};
+            $my->{mark_count}{DEFAULT_MARK}{$underColor}++;
         }
     }
     unless($my->{provisional}) {
-        push(@{$my->{overlist}}, $int) unless(exists($int->{overstones}));
-        push(@{$int->{overstones}}, $color, $num);
+        push(@{$my->{overlist}}, $int) unless(exists($int->{overstones})); # list of all overstones in the diagram
+        push(@{$int->{overstones}}, $color, $num);  # list of all overstones for this intersection
         delete($int->{capture});
     }
 }
@@ -598,7 +670,7 @@ overstones (B<game_stone>s) are not considered.
 
 Fails and returns 0 if:
 
-=over
+=over 4
 
 =item *
 
@@ -700,10 +772,11 @@ sub _checkArgs {
     return 1;
 }
 
-=item $diagram-E<gt>B<label>('coords', 'char');
+=item $diagram-E<gt>B<label>('coords', 'text');
 
-Place a label on an intersection.  B<char> must be a single letter
-from A to Z or from a to z.
+Place a label on an intersection.  B<text> may be any text, but notice that
+long strings may overflow a stone or intersection.  If 'text' is empty ('')
+any existing label is removed.
 
 The same label can be applied to several intersections only if they
 are all labeled within a single B<node>.
@@ -721,12 +794,7 @@ sub label {
         carp("'label' expects a '\$coords' argument");
         return 0;
     }
-    unless (defined($label) and
-        ($label =~ /^[[:upper:][:lower:]]$/)) {
-        $label = 'undef' unless defined($label);
-        carp("'label' expects a single letter, not $label");
-        return 0;
-    }
+    return unless (defined($label));
     if ($my->{provisional}) {
 # print "provisional ";
         push (@{$my->{actions}}, sub { $_[0]->label($coords, $label); } );
@@ -734,14 +802,18 @@ sub label {
 # print "label $coords with $label\n";
     $my->{board}{$coords} = {} unless defined($my->{board}{$coords});
     my $int = $my->{board}{$coords};    # intersection
+    if ($label eq '') {
+        delete $int->{label};
+        return $my->{node};
+    }
     if ((exists($int->{label}) and
-         ($int->{label} ne $label)) or  # different label already here?
-        exists($int->{mark}) or         # a mark?
-        exists($int->{number}) or       # a number?
-        (exists($my->{label}{$label}) and               # label already used?
-         ($my->{label}{$label} != $my->{node}))) {      # outside labeling group?
+         ($int->{label} ne $label)) or              # different label already here?
+        exists($int->{mark}) or                     # a mark?
+        exists($int->{number}) or                   # a number?
+        (exists($my->{label}{$label}) and           # label already used?
+         ($my->{label}{$label} != $my->{node}))) {  # outside labeling group?
 # print "label conflict $coords $label\n";
-        $my->{conflict} = 1;
+        $my->{conflict} = 'label: mark, number, or previous label conflict';
         return 0;
     }
     unless ($my->{provisional}) {
@@ -752,60 +824,53 @@ sub label {
     return $my->{node};
 }
 
-=item $diagram-E<gt>B<mark>('coords');
+=item $diagram-E<gt>B<mark>('coords', ? 'mark_type' ?);
 
-Place a mark on a stone (empty intersections cannot be marked).
+Place a mark on a stone or intersection.  The 'mark_type' can be any text,
+but is usually the SGF property:
 
-The mark can be applied to several stones only if they are either: 
+=over 4
 
-=over
+=item CR  circle
 
-=item *
+=item MA  an X mark
 
-different color stones (black, white)
+=item SQ  square
 
-=item *
-
-all marked within one B<node>.
-
-=back
-
-Z<>
-
-The B<mark> causes a conflict if:
-
-=over
-
-=item *
-
-the stone is a B<label>led or numbered stone, or
-
-=item *
-
-the same color mark already exists in the B<Diagram> for a
-different B<mark>ing group, or
-
-=item *
-
-B<overstone_eq_mark> is true and there is already an
-overstone of the same color in the B<Diagram>.
+=item TR  triangle
 
 =back
 
-Z<>
+If 'mark_type' is not supplied (or undef), MA is assumed.
+
+The B<mark> raises a conflict if:
+
+=over 4
+
+=item *
+
+the intersection is already B<label>led or numbered, or
+
+=item *
+
+the same color and 'mark_type' already exists in the B<Diagram> for a
+previous node (possibly from creating an understone).
+
+=back
 
 =cut
 
 sub mark {
-    my ($my, $coords) = @_;
+    my ($my, $coords, $mark_type) = @_;
 
     unless(defined($coords)) {
         carp("'mark' expects a '\$coords' argument");
         return 0;
     }
     if ($my->{provisional}) {
-        push (@{$my->{actions}}, sub { $_[0]->mark($coords); } );
+        push (@{$my->{actions}}, sub { $_[0]->mark($coords, $mark_type); } );
     }
+# print "put $mark_type mark $coords\n";
     $my->{board}{$coords} = {} unless defined($my->{board}{$coords});
     my $int = $my->{board}{$coords};    # intersection
     my $color = 'empty';
@@ -814,17 +879,73 @@ sub mark {
     if (exists($int->{label}) or        # label already here?
         exists($int->{number}) or       # number already here?
 
-        (exists($my->{mark}{$color}) and                # mark/color already used?
-         ($my->{mark}{$color} != $my->{node}))) {       # outside group?
-# print "put mark $coords\n";
-        $my->{conflict} = 1;
+        (exists($my->{mark}{$mark_type}{$color}) and                # type/color already used?
+         ($my->{mark}{$mark_type}{$color} != $my->{node}))) {       # outside group?
+        $my->{conflict} = 'mark: label or number conflict';
         return 0;
     }
     unless ($my->{provisional}) {
-        $int->{mark} = $my->{node};
-        $my->{mark}{$color} = $my->{node};
+        $int->{mark} = $mark_type;
+        $my->{mark}{$mark_type}{$color} = $my->{node};  # flag global mark on this node
+        $my->{mark_count}{$mark_type}{$color}++;        # count marks of each type and color
     }
     return $my->{node};
+}
+
+=item my $diagram-E<gt>B<territory> ($propID, $coords);
+
+$propID should be one of 'TB', 'TW', or undef.  B<territory> marks the
+intersection $coords as being white or black territory (see 'TB', 'TW' in
+the B<get> method below).  If $number is undef, any previous territory
+marking is removed.
+
+=cut
+
+sub territory {
+    my ($my, $propID, $coords) = @_;
+
+    unless(defined($coords)) {
+        carp("'territory' expects '\$propID', and '\$coords' arguments");
+        return 0;
+    }
+    if ($my->{provisional}) {
+        push (@{$my->{actions}}, sub { $_[0]->territory($propID, $coords); } );
+    } else {
+        $my->{board}{$coords} = {} unless defined($my->{board}{$coords});
+        if (defined($propID)) {
+            $my->{board}{$coords}{$propID} = $propID;   # mark the intersection
+        } else {
+            delete($my->{board}{$coords}{$propID});     # unmark the intersection
+        }
+    }
+}
+
+=item my $diagram-E<gt>B<view> ($coords);
+
+If $coords is defined, then the game-level VW property is set, and the
+intersection at $coords is marked as viewable (hash key is 'VW').  If
+$coords is '' or undef, then the game-level VW property is deleted, and the VW
+mark is removed from all intersections.
+
+=cut
+
+sub view {
+    my ($my, $coords) = @_;
+
+    if ($my->{provisional}) {
+        push (@{$my->{actions}}, sub { $_[0]->view($coords); } );
+    } else {
+        if (defined($coords) and
+            ($coords ne '')) {
+            $my->{property}{0}{VW} = (1);   # set game-level viewable property
+            $my->{board}{$coords}{VW} = 1;  # mark the intersection as viewable
+        } else {
+            delete ($my->{property}{0}{VW});        # remove game-level viewable property
+            foreach (keys(%{$my->{board}})) {
+                delete($my->{board}{$_}{VW});  # remove all viewable marks
+            }
+        }
+    }
 }
 
 =item my $nameListRef = $diagram-E<gt>B<name> (? name, ... ?)
@@ -857,11 +978,15 @@ collection of properties associated with move $number.
 
 Note that B<renumber>ing a move also B<renumber>s the properties.
 
+If $number and $propName are defined and $propValue is not ( or is empty),
+the $propName property is removed.
+
 If $number is defined and $propName/$propValue are not, B<property>
 returns a reference to the (possibly empty) hash of property IDs and
 property Values associated with the move number:
 
-    my $prop_value = $prop_ref->{$propID}->[$idx].
+    my $prop_ref = $diagram->property($number);
+    my $prop_value = $prop_ref->{$propID}->[$idx];
 
 If $number is not defined, returns a reference to the (possibly
 empty) hash of properties stored in the B<Diagram>.  Hash keys are
@@ -869,6 +994,7 @@ the move number, and each hash value is in turn a hash.  The keys of
 the property hashes are (short) property IDs and the hash values are
 lists of property values for each property ID:
 
+    my $all_prop_ref = $diagram->property();
     my $prop_value = $all_props_ref->{$moveNumber}->{$propID}->[$idx]
 
 B<property> (when $propName and $propValue are defined) is an action
@@ -876,18 +1002,224 @@ B<property> (when $propName and $propValue are defined) is an action
 associated with a node in the SGF.  However, B<property> never
 causes a conflict.
 
+Note that sgf2dg stores the following properties:
+
+        propID          number  propVal          comment
+        ------          ------  -------
+    Move properties
+        W[] or W[tt]    move    'pass'           white pass
+        B[] or B[tt]    move    'pass'           black pass
+        KO              move     ''              force move
+        PL[W|B]         move     'W' | 'B'       set player
+    Node annotation properties
+        C[text]         move     text            move comment
+        DM[dbl]         move     0 | 1           Even position
+        GB[dbl]         move     0 | 1           Good for black
+        GW[dbl]         move     0 | 1           Good for white
+        HO[dbl]         move     0 | 1           Hotspot
+        UC[dbl]         move     0 | 1           Unclear
+        N[stxt]         move     simple_text     Name (node name)
+        V[real]         move     real            Value (estimated game score)
+    Move annotation properties
+        BM[dbl]         move     0 | 1           Bad move
+        DO              move     ''              Doubtful move
+        IT              move     ''              Interesting move
+        TE[dbl]         move     0 | 1           Tesuji (good move)
+    Markup properties
+        AR[c_pt]        move     'pt:pt'         Arrow
+        DD[elst]        move     'pt?'           Dim points: DD[] clears
+        LN[c_pt]        move     'pt:pt'         Line
+        SL[lst]         move     'pt'            Select points (markup unknown)
+    Root properties
+        AP[stxt:stxt]   0        'stxt:stxt'     Application_name:version
+        CA[stxt]        0        'charset'       character set
+        FF[1-4]         0        0 - 4           FileFormat
+        GM[1-16]        0        0 - 16          Game
+        ST[0-3]         0        0 - 3           How to show variations (style?)
+    Game info properties
+        AN[stxt]        0        simple_text     Annotater (name)
+        BT[stxt]        0        simple_text     Black team
+        WT[stxt]        0        simple_text     White team
+        CP[stxt]        0        simple_text     Copyright
+        ON[stxt]        0        simple_text     Opening information
+        OT[stxt]        0        simple_text     Overtime description (byo-yomi)
+        PC[stxt]        0        simple_text     Place game was played
+        RE[stxt]        0        simple_text     Result
+        RO[stxt]        0        simple_text     Round
+        RU[stxt]        0        simple_text     Rules
+        SO[stxt]        0        simple_text     Source
+        US[stxt]        0        simple_text     User/program who entered the game
+        GC[text]        0        text            Game comment
+        TM[real]        0        real_number     Time limits
+    Timing properties
+        BL[real]        move     real_number     BlackLeft (time)
+        WL[real]        move     real_number     WhiteLeft (time)
+        OB[num]         move     number          Black moves left (after this move)
+        OW[num]         move     number          White moves left
+    Go-specific properties
+        HA[num]         0        number          Handicap
+        KM[real]        0        real_number     Komi
+    Misc. properties
+        PM[num]         move     number          Print mode - see FF4 spec
+        BS[stext]       move     stext           BlackSpecies (deprecated)
+        WS[stext]       move     stext           WhiteSpecies (deprecated)
+        FG[pt:stext]    move     bitmask:stext   Figure: see FF4 spec
+
 =cut
 
 sub property {
     my ($my, $number, $propId, @propVals) = @_;
 
+    $my->{property} = {} unless(exists($my->{property}));
     if (defined($propId)) {
-        push(@{$my->{actions}}, sub { push(@{$_[0]->{property}{$number}{$propId}}, @propVals); } );
+        if ($my->{provisional}) {
+            push (@{$my->{actions}}, sub { $_[0]->property($number, $propId, @propVals); } );
+        } else {
+            if (@propVals) {
+                push(@{$my->{property}{$number}{$propId}}, @propVals);
+            } else {
+                delete($my->{property}{$number}{$propId});
+            }
+        }
     }
-    return {} unless(exists($my->{property}));
     return ($my->{property}{$number} || {}) if (defined($number));
     return $my->{property};
 }
+
+
+=item @title_lines = $diagram-E<gt>B<gameProps_to_title> (\&emph_sub)
+
+B<gameProps_to_title> converts game (node 0) properties extracted from the
+SGF file.  The properties are scanned in the order listed here:
+
+=over 4
+
+=item GN GameName
+
+=item EV EVent
+
+=item RO ROund (joined to EVent)
+
+=item DT DaTe
+
+=item PC PlaCe
+
+=item PW PlayerWhite "White:"
+
+=item WR WhiteRank (joined to PW)
+
+=item PB PlayerBlack "Black"
+
+=item BR BlackRank (joined to PB)
+
+=item KM KoMi "Komi:"
+
+=item RU RUles "Rules:"
+
+=item TM TiMe "Time:"
+
+=item OT OverTime (byo-yomi) "Byo-yomi:"
+
+=item RE REsult "Result:"
+
+=item AN ANnotator "Annotated by:"
+
+=item SO Source "Source:"
+
+=item US USer "Entered by:"
+
+=item CP CoPyright
+
+=item GC GameComment
+
+=back
+
+For each property that is found, a line is added to the @title_lines return
+array.  If the property has a string in double-quotes in the list above,
+that string (plus one space) is prefixed to the property text.  In
+addition, if \&emph_sub is defined, the prefix is passed to &$emph_sub to
+make those portions appear emphasized in the title lines.  Example:
+
+    my @title = $diagram->gameProps_to_title(sub { "{\\bf $_[0]}" });
+
+wraps portions of the title line in TeX's bold-face (bf) style.
+
+=cut
+
+# pairs: first is short property ID, second is a prefix (which may be
+# emphasized)
+my @game_titles = (
+            'GN', '',               # GameName
+            'EV', '',               # Event and Round number
+            'DT', '',               # DaTe
+            'PC', '',               # PlaCe
+            'PW', 'White:',         # PlayerWhite and WhiteRank
+            'PB', 'Black:',         # PlayerBlack and BlackRank
+            'KM', 'Komi:',          # KoMi
+            'RU', 'Rules:',         # RUles
+            'TM', 'Time:',          # TiMe constraints
+            'OT', 'Byo-yomi:',      # OverTime
+            'RE', 'Result:',        # REsult
+            'AN', 'Annotated by:',  # ANnotater
+            'SO', 'Source:',        # SOurce?
+            'US', 'Entered by:',    # USer
+            'CP', '',               # CoPyright
+            'GC', '',               # GameComment
+            );
+
+sub gameProps_to_title {
+    my ($my, $emph_sub) = @_;
+
+    my %hash;
+    my $gprops = $my->property(0);              # game properties are at node 0
+    foreach my $key (keys(%{$gprops})) {
+        my $short = $key;
+        $short =~ s/[^A-Z]//g;                  # delete everything but upper case letters
+        my $text = join('', @{$gprops->{$key}});
+        $text =~ s/\n//gm;                      # should be simpletext already...
+        $text =~ s/0*$// if ($short eq 'KM');   # remove ugly trailing zeros on komi supplied by IGS
+        $hash{$short} = $text;
+    }
+    if (exists($hash{WR})) {
+        if (exists($hash{PW})) {
+            $hash{PW} = "$hash{PW} $hash{WR}";  # join name and rank
+        } else {
+            $hash{PW} = $hash{WR};              # rank only?
+        }
+    }
+    if (exists($hash{BR})) {
+        if (exists($hash{PB})) {
+            $hash{PB} = "$hash{PB} $hash{BR}";  # join name and rank
+        } else {
+            $hash{PB} = $hash{BR};              # rank only?
+        }
+    }
+    if (exists($hash{RO})) {
+        if (exists($hash{EV})) {
+            $hash{EV} = "$hash{EV} - $hash{RO}";# join event and round
+        } else {
+            $hash{EV} = $hash{RO};              # round only?
+        }
+    }
+
+    $emph_sub = sub { return shift } unless(defined($emph_sub));
+    my @lines;
+    for (my $ii = 0; $ii < @game_titles; $ii += 2) {
+        my $prop = $game_titles[$ii];
+        next unless (exists $hash{$prop} and
+                     $hash{$prop} ne '');
+        my $pre = $game_titles[$ii + 1];
+        if ($pre ne '') {
+            $pre = &$emph_sub($pre);
+            $pre .= ' ';
+        }
+        push @lines, "$pre$hash{$prop}";
+    }
+    return @lines;
+}
+
+
+
 
 =item $diagram-E<gt>B<capture> ('coords')
 
@@ -947,39 +1279,35 @@ sub remove {
     return $my->{node};
 }
 
-=item my $stone = $diagram-E<gt>B<game_stone>(coords);
+=item my $stone = $diagram-E<gt>B<game_stone>(coords | $intersection);
 
-Returns 'black' or 'white' if there is a stone currently on the
-intersection, otherwise returns undef.
+Returns 'black' or 'white' if there is a stone currently on the coords or
+intersection (a reference to an intersection, such as is returned by
+$diagram-E<gt>B<get>) , otherwise returns undef.
 
-Note that the return value is determined by the game perspective,
-not the diagram perspective.  If a stone is B<put> and later
-B<capture>d, B<game_stone> returns undef even though the diagram
-should still show the original stone.  If a white stone is B<put>
-and later B<capture>d, and then a black stone is B<put>,
-B<game_stone> returns 'black', and B<get> indicates that a white
-stone should be displayed on the diagram.
+Note that the return value is determined by the game perspective, not the
+diagram perspective.  If a stone is B<put> and later B<capture>d,
+B<game_stone> returns undef even though the diagram should still show the
+original stone.  If a white stone is B<put> and later B<capture>d, and then
+a black stone is B<put>, B<game_stone> returns 'black', and B<get>
+indicates that a white stone should be displayed on the diagram.
 
-Note also that since B<put> is provisional until B<node> is called.
-If you use B<game_stone> to check for liberties and captures, it
-must be done I<after> the call to B<node> that realizes the B<put>.
+Note also that since B<put> is provisional until B<node> is called.  If you
+use B<game_stone> to check for liberties and captures, it must be done
+I<after> the call to B<node> that realizes the B<put>.
 
 =cut
 
 sub game_stone {
-    my ($my, $coords) = @_;
-
-    unless(defined($coords)) {
-        carp("'game_stone' expects a '\$coords' argument");
-        return 0;
-    }
-    my $int = $my->{board}{$coords};    # intersection
-    return $my->_game_stone_int($my->{board}{$coords});
-}
-
-sub _game_stone_int {
     my ($my, $int) = @_;
 
+    unless(defined($int)) {
+        carp("'game_stone' expects a 'coords' or \$intersection argument");
+        return 0;
+    }
+    if (ref($int) ne 'HASH') {
+        $int = $my->{board}{$int};
+    }
     return undef unless(defined($int));
     return undef if(exists($int->{capture}));          # well, it *was* here a moment ago...
     # check overstone history
@@ -1004,7 +1332,7 @@ an empty intersection.
 
 The hash keys can be any of:
 
-=over
+=over 4
 
 =item 'hoshi'
 
@@ -1033,36 +1361,31 @@ intersection is currently empty from the perspective of the game.
 
 =item 'mark'
 
-The intersection or stone is marked.
+The intersection or stone is marked.  The value indicates the type of mark,
+usually the SGF property:
 
-=item 'overstone'
+=over 4
 
-If B<overstone_eq_mark> is false, this hash entry gets the current
-node when an un-numbered, un-labeled stone is converted to an
-overstone.  If B<overstone_eq_mark> is false, this hash entry is
-never set (under the same circumstances, the intersection is
-'mark'ed instead).
+=item CR  circle
+
+=item MA  an X mark
+
+=item SQ  square
+
+=item TR  triangle
+
+=back
 
 =item 'label'
 
-The hash key is the word 'label', and the value is the single
-character passed to the B<label> method.  Note that the node can be
-retrieved with:
-
-    my $intersection = $diagram->get;
-    my $label = $intersection->{label};
-    my $label_node = $intersection->{$label};
-
-=item label
-
-The hash key is the single character a-z or A-Z that is the B<label>
-for this intersection or stone.  The hash value is the node.
+The intersection has been labeled.  The value indicates the text of the
+label.
 
 =item 'overstones'
 
-If this hash entry exists it means that one or more stones were
-overlayed on the stone that is currently displayed on this
-intersection of the B<Diagram>.
+If this hash entry exists it means that one or more stones were overlayed
+on the stone that is currently displayed on this intersection of the
+B<Diagram>.
 
 The hash value is a reference to an array of color/number pairs.
 The colors and numbers were passed to the B<put> method which
@@ -1072,7 +1395,26 @@ This is typically seen as notes to the side of the diagram saying
 something like "black 33 was played at the marked white stone".  In
 this example. the information returned by B<get> describes 'the
 marked white stone', while 'black' will be the first item in the
-'overstones' array, and '33' will be the second.
+'overstones' array, and '33' will be the second:
+
+    $diagram->get($coords) == {white => node_number,
+                               overstones => ['black', 33],
+                               ...}
+
+=item 'TB' or 'TW'
+
+Intersection has been marked as black or white territory with a TB or TW
+property.
+
+=item 'view'
+
+Set when the intersection is marked with a VW view property.  Relates to
+the VW game B<property>:
+
+    if ((not $diagram->property(0)->VW) or      # no game-level VieW property
+         $intersection->{view}) {               # this intersection is viewable
+       # display this intersection
+    }
 
 =back
 
@@ -1090,6 +1432,59 @@ sub get {
         return {};
     }
     return $my->{board}{$coords} || {};
+}
+
+=item my $coord_string = $diagram-E<gt>B<xcoord>($x)
+
+=item my $coord_string = $diagram-E<gt>B<ycoord>($y)
+
+Returns a string to display for a given $x or $y coordinate.  The string
+returned depends not only on the $x or $y value, but also on the
+B<coords_style> and B<boardSizeX/Y> configuration options,
+
+=cut
+
+sub xcoord {
+    my ($my, $x) = @_;
+
+    $x--;
+    if (lc($my->{coord_style}) eq 'sgf') {
+        if ($x <= 26) {
+            return chr($x + ord 'a');
+        } elsif ($x <= 52) {
+            return chr($x + ord 'A');
+        } else {
+            return '';
+        }
+    } elsif ($my->{coord_style} eq '++' or
+             $my->{coord_style} eq '+-') {
+        return "$x";
+    } elsif ($my->{coord_style} eq '-+' or
+             $my->{coord_style} eq '--') {
+        my $c = $my->{boardSizeX} - $x - 1;
+        return "$c";
+    } else {    # normal
+        return substr('ABCDEFGHJKLMNOPQRSTUVWXYZ', $x % 25, 1) x (1 + int($x / 25));
+    }
+}
+
+sub ycoord {
+    my ($my, $y) = @_;
+
+    $y--;
+    if (lc($my->{coord_style}) eq 'sgf') {
+        return $my->xcoord($y + 1);       # same translation
+    } elsif ($my->{coord_style} eq '++' or
+             $my->{coord_style} eq '-+') {
+        return "$y";
+    } elsif ($my->{coord_style} eq '+-' or
+             $my->{coord_style} eq '--') {
+        my $c = $my->{boardSizeY} - $y - 1;
+        return "$c"
+    } else {    # normal
+        my $c = $my->{boardSizeY} - $y;
+        return "$c"
+    }
 }
 
 =item my $first_number = $diagram-E<gt>B<first_number>
@@ -1147,7 +1542,7 @@ sub parent {
 
 If $new_number is defined, sets the B<var_on_move> for this diagram.
 This is intended to be used in conjunction with the <Bparent>
-information to title diagrams such as 
+information to title diagrams such as
 
     my $title = "Variation 2 on move " .
                 $diagram->var_on_move .

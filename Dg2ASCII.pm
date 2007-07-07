@@ -1,4 +1,4 @@
-# $Id: Dg2ASCII.pm 143 2005-06-03 21:05:57Z reid $
+# $Id: Dg2ASCII.pm 201 2007-06-11 00:38:40Z reid $
 
 #   Dg2ASCII
 #
@@ -57,7 +57,7 @@ our @EXPORT = qw(
 );
 
 BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 143 $' =~ /(\d+)/;
+    our $VERSION = sprintf "1.%03d", '$Revision: 201 $' =~ /(\d+)/;
 }
 
 ######################################################
@@ -80,9 +80,13 @@ use constant WHITE       => " O  ";    # numberless white stone
 use constant BLACK       => " X  ";    # numberless black stone
 use constant MARKEDWHITE => " @  ";    # marked white stone
 use constant MARKEDBLACK => " #  ";    # marked black stone
+use constant MARKEDEMPTY => " ?  ";    # marked empty intersection
+use constant WHITE1      => "O"   ;    # numberless white stone
+use constant BLACK1      => "X"   ;    # numberless black stone
 
 our %options = (
-    boardSize       => 19,
+    boardSizeX      => 19,
+    boardSizeY      => 19,
     doubleDigits    => 0,
     coords          => 0,
     topLine         => 1,
@@ -116,7 +120,8 @@ A B<new> Games::Go::Dg2ASCII takes the following options:
 
 =over 4
 
-=item B<boardSize> =E<gt> number
+=item B<boardSizeX> =E<gt> number
+=item B<boardSizeY> =E<gt> number
 
 Sets the size of the board.
 
@@ -162,6 +167,8 @@ Default:
           $x = chr($x - 1 + ord('a')); # convert 1 to 'a', etc
           $y = chr($y - 1 + ord('a'));
           return("$x$y"); },           # concatenate two letters
+
+See also the B<diaCoords> method below.
 
 =item B<file> =E<gt> 'filename' | $descriptor | \$string | \@array
 
@@ -259,8 +266,24 @@ sub configure {
     # make sure edges of the board don't exceed boardSize
     $my->{topLine}    = 1 if ($my->{topLine} < 1);
     $my->{leftLine}   = 1 if ($my->{leftLine} < 1);
-    $my->{bottomLine} = $my->{boardSize} if ($my->{bottomLine} > $my->{boardSize});
-    $my->{rightLine}  = $my->{boardSize} if ($my->{rightLine} > $my->{boardSize});
+    $my->{rightLine}  = $my->{boardSizeX} if ($my->{rightLine} > $my->{boardSizeX});
+    $my->{bottomLine} = $my->{boardSizeY} if ($my->{bottomLine} > $my->{boardSizeY});
+}
+
+=item my $coord = $dg2mp-E<gt>B<diaCoords> ($x, $y)
+
+Provides access to the B<diaCoords> option (see above).  Returns
+coordinates in the converter's coordinate system for board coordinates ($x,
+$y).  For example, to get a specific intersection structure:
+
+    my $int = $diagram->get($dg2mp->diaCoords(3, 4));
+
+=cut
+
+sub diaCoords {
+    my ($my, $x, $y) = @_;
+
+    return &{$my->{diaCoords}}($x, $y);
 }
 
 =item $dg2ascii-E<gt>B<print> ($text ? , ... ?)
@@ -319,6 +342,10 @@ Converts a I<Games::Go::Diagram> into ASCII.  If B<file> was defined
 in the B<new> method, the ASCII is dumped into the B<file>.  In any
 case, the ASCII is returned as a string scalar.
 
+Labels are restricted to one character (any characters after the first
+are discarded).
+
+
 =cut
 
 sub convertDiagram {
@@ -327,13 +354,14 @@ sub convertDiagram {
     unless($my->{firstDone}) {
         $my->print("
 Black -> X   Marked black -> #   Labeled black -> Xa, Xb
-White -> O   Marked white -> @   Labeled white -> Oa, Ob\n");
+White -> O   Marked white -> @   Labeled white -> Oa, Ob
+             Marked empty -> ?   Labeled empty ->  a,  b\n");
         $my->{firstDone} = 1;
     }
-    $my->convertProperties($diagram->property(0));      # any game-level properties?
     my @name = $diagram->name;
     $name[0] = 'Unknown Diagram' unless(defined($name[0]));
-    my $propRef = $diagram->property;                   # get property list for the diagram
+    my $propRef = $diagram->property;           # get property list for the diagram
+    $my->{VW} = exists($propRef->{0}{VW});      # view control?
     my $first = $diagram->first_number;
     my $last = $diagram->last_number;
     $my->{offset} = $diagram->offset;
@@ -353,14 +381,22 @@ White -> O   Marked white -> @   Labeled white -> Oa, Ob\n");
         # carp("Hmmm! No numbered moves in $name[0]");
     }
 
-    if (exists($propRef->{0}{N})) {
-        $range .= "\n\n$propRef->{0}{N}";       # node name
-    }
     # get some measurements based on font size
     my ($diaHeight, $diaWidth) = (($my->{bottomLine} - $my->{topLine} + 1), ($my->{rightLine} - $my->{leftLine} + 1));
     if ($my->{coords}) {
         $diaWidth += 4;
         $diaHeight += 2;
+    }
+    unless(exists($my->{titleDone})) {      # first diagram only:
+        $my->{titleDone} = 1;
+        my @title_lines = $diagram->gameProps_to_title();
+        my $title = '';
+        foreach (@title_lines) {
+            $title .= "$_\n";
+        }
+        if($title ne '') {
+            $my->print("\n\n$title\n");
+        }
     }
     $my->_preamble($diaHeight, $diaWidth);
     if (defined($diagram->var_on_move) and
@@ -384,22 +420,28 @@ White -> O   Marked white -> @   Labeled white -> Oa, Ob\n");
             $my->_convertIntersection($diagram, $x, $y);
         }
         if ($my->{coords}) {    # right-side coords
-            $my->print($my->{boardSize} - $y + 1);
+            $my->print($diagram->ycoord($y));
         }
         $my->print("\n");
         if ($y < $my->{bottomLine}) {
             if ($my->{rightLine} - $my->{leftLine} > 1) {
-                $my->print(LEFT,
+                $my->print(($my->{leftLine} == 1) ? LEFT : '    ',
                            '    ' x ($my->{rightLine} - $my->{leftLine} - 1),
-                           RIGHT,
+                           ($my->{rightLine} == $my->{boardSizeY}) ? RIGHT : '',
                            "\n");
             } else {
                 $my->print(LEFT, "\n");       # doesn't seem very likely!
             }
         }
     }
-    # print coordinates
-    $my->_interlude($diaWidth, $diaHeight);
+    # print coordinates along the bottom
+    if ($my->{coords}) {
+        my ($l, $r) = ($my->{leftLine}, $my->{rightLine});
+        $my->print(' ');
+        for ($my->{leftLine} .. $my->{rightLine}) {
+            $my->print($diagram->xcoord($_), '   ');
+        }
+    }
 
     # deal with the over-lay stones
     $my->_convertOverstones($diagram);
@@ -407,11 +449,16 @@ White -> O   Marked white -> @   Labeled white -> Oa, Ob\n");
     # print the game comments for this diagram
     foreach my $n (sort { $a <=> $b } keys(%{$propRef})) {
         my @comment;
-        if ((exists($propRef->{$n}{B}) and
-             ($propRef->{$n}{B}[0] eq 'tt')) or
-            (exists($propRef->{$n}{W}) and
-             ($propRef->{$n}{W}[0] eq 'tt'))) {
-            push(@comment, "Pass\n\n");
+        if (exists($propRef->{$n}{B}) and
+            ($propRef->{$n}{B}[0] eq 'pass')) {
+            push(@comment, "Black Pass\n\n");
+        }
+        if (exists($propRef->{$n}{W}) and
+             ($propRef->{$n}{W}[0] eq 'pass')) {
+            push(@comment, "White Pass\n\n");
+        }
+        if (exists($propRef->{$n}{N})) {
+            push(@comment, "$propRef->{$n}{N}[0]\n"); # node name
         }
         if (exists($propRef->{$n}{C})) {
             push(@comment, @{$propRef->{$n}{C}});
@@ -443,107 +490,6 @@ sub convertText {
     my ($my, $text) = @_;
 
     return $text;
-}
-
-=item $title = $dg2ascii-E<gt>B<convertProperties> (\%sgfHash)
-
-B<convertProperties> takes a reference to a hash of properties as
-extracted from an SGF file.  Each hash key is a property ID and the
-hash value is a reference to an array of property values:
-$hash->{propertyId}->[values].  The following SGF properties are
-recognized:
-
-=over 4
-
-=item GN GameName
-
-=item EV EVent
-
-=item RO ROund
-
-=item PW PlayerWhite
-
-=item WR WhiteRank
-
-=item PB PlayerBlack
-
-=item BR BlackRank
-
-=item DT DaTe
-
-=item PC PlaCe
-
-=item GC GameComment
-
-=item KM KoMi
-
-=item RE REsult
-
-=item TM TiMe
-
-=back
-
-Both long and short property names are recognized, and all
-unrecognized properties are ignored with no warnings.  Note that
-these properties are all intended as game-level notations.
-
-=cut
-
-sub convertProperties {
-    my ($my, $hashRef) = @_;
-
-    return unless(defined($hashRef));
-    my %hash;
-    foreach my $key (keys(%{$hashRef})) {
-        my $short = $key;
-        $short =~ s/[^A-Z]//g;                  # delete everything but upper case letters
-        $hash{$short} = join('', @{$hashRef->{$key}});
-    }
-
-    my @lines;
-    push(@lines, $hash{GN}) if(exists($hash{GN}));      # GameName
-    if (defined($hash{EV})) {
-        if (defined($hash{RO})) {
-            push(@lines, "$hash{EV} - Round $hash{RO}");# EVent name and ROund number
-        } else {
-            push(@lines, $hash{EV});                    # EVent
-        }
-    }
-    if (defined($hash{PW})) {
-        if(defined($hash{WR})) {
-            push(@lines, "White: $hash{PW} $hash{WR}");  # PlayerWhite and WhiteRank
-        } else {
-            push(@lines, "White: $hash{PW}");            # PlayerWhite
-        }
-    }
-    if (defined($hash{PB})) {
-        if(defined($hash{BR})) {
-            push(@lines, "Black: $hash{PB} $hash{BR}");  # PlayerBlack and BlackRank
-        } else {
-            push(@lines, "Black: $hash{PB}");            # PlayerBlack
-        }
-    }
-    push(@lines, $hash{DT}) if (defined($hash{DT}));            # DaTe
-    push(@lines, $hash{PC}) if (defined($hash{PC}));            # PlaCe
-    push(@lines, $hash{GC}) if (defined($hash{GC}));            # GameComment
-    if (defined($hash{KM})) {                                   # komi
-        if ($hash{KM} =~ m/(\d+\.\d+?)0*$/) {
-            # remove ugly trailing zeros supplied by IGS
-            $hash{KM} = $1;
-        }
-        push(@lines, "Komi: $hash{KM}");
-    }
-    push(@lines, "Result: $hash{RE}") if (defined($hash{RE}));   # result
-    push(@lines, "Time: $hash{TM}") if (defined($hash{TM}));     # time constraints
-    my ($title)='';
-    foreach my $line (@lines) {
-        next unless (defined($line));
-        $line =~ s/\\([][)(\\])/$1/g;                           # change escaped chars to non-escaped
-        $title .= "$line\n";
-    }
-    if($title ne '') {
-        $my->print("\n$title\n");
-    }
 }
 
 =item $dg2ascii-E<gt>B<close>
@@ -592,7 +538,7 @@ sub _convertOverstones {
             unless (exists($int->{mark})) {
                 my $mv = '';
                 $mv .= " black node=$int->{black}" if (exists($int->{black}));
-                $mv .= " white node=$int->{white}" if (exists($int->{black}));
+                $mv .= " white node=$int->{white}" if (exists($int->{white}));
                 carp("Oops: understone$mv is not numbered or marked? " .
                      "This isn't supposed to be possible!");
             }
@@ -609,7 +555,7 @@ sub _convertOverstones {
         push(@converted, "$overStones at $atStone");
     }
     return '' unless(@converted);
-    $my->print(join(",\n", @converted), "\n");
+    $my->print("\n", join(",\n", @converted), "\n");
 }
 
 sub _checkStoneNumber {
@@ -639,7 +585,12 @@ sub _formatNumber {
 sub _convertIntersection {
     my ($my, $diagram, $x, $y) = @_;
 
-    my $int = $diagram->get(&{$my->{diaCoords}}($x, $y));
+    my $int = $diagram->get($my->diaCoords($x, $y));
+    if ($my->{VW} and               # view control AND
+        not exists($int->{VW})) {   # no view on this intersection
+        $my->print('    ');
+        return;
+    }
     my $stone;
     if (exists($int->{number})) {
         $stone = $my->_formatNumber($my->_checkStoneNumber($int->{number})); # numbered stone
@@ -649,15 +600,15 @@ sub _convertIntersection {
         }elsif (exists($int->{white})) {
             $stone = MARKEDWHITE;                       # marked white stone
         } else {
-            carp("Can't mark empty intersction");
+            $stone = MARKEDEMPTY;                       # marked empty intersection
         }
     } elsif (exists($int->{label})) {
         if (exists($int->{black})) {
-            $stone = ' ' . BLACK . lc($int->{label}) . ' ';     # labeled black stone
+            $stone = ' ' . BLACK1 . substr($int->{label}, 0, 1) . ' ';     # labeled black stone
         } elsif (exists($int->{white})) {
-            $stone = ' ' . WHITE . lc($int->{label}) . ' ';     # labeled white stone
+            $stone = ' ' . WHITE1 . substr($int->{label}, 0, 1) . ' ';     # labeled white stone
         } else {
-            $stone = " $int->{label}  ";                        # labeled intersection
+            $stone = ' ' . substr($int->{label}, 0, 1) . '  ';               # labeled intersection
         }
     } elsif (exists($int->{white})) {
         $stone = WHITE;       # numberless white stone
@@ -681,15 +632,15 @@ sub _underneath {
 
     if ($y <= 1) {
         return TOPLEFT if ($x <= 1);            # upper left corner
-        return TOPRIGHT if ($x >= $my->{boardSize}); # upper right corner
+        return TOPRIGHT if ($x >= $my->{boardSizeX}); # upper right corner
         return TOP;                             # upper side
-    } elsif ($y >= $my->{boardSize}) {
+    } elsif ($y >= $my->{boardSizeY}) {
         return BOTTOMLEFT if ($x <= 1);         # lower left corner
-        return BOTTOMRIGHT if ($x >= $my->{boardSize}); # lower right corner
+        return BOTTOMRIGHT if ($x >= $my->{boardSizeX}); # lower right corner
         return BOTTOM;                          # lower side
     }
     return LEFT if ($x <= 1);                   # left side
-    return RIGHT if ($x >= $my->{boardSize});   # right side
+    return RIGHT if ($x >= $my->{boardSizeX});   # right side
     return MIDDLE;                              # somewhere in the middle
 }
 
@@ -698,17 +649,6 @@ sub _preamble {
     my ($my, $diaHeight, $diaWidth) = @_;
 
     return;
-}
-
-sub _interlude {
-    my ($my, $diaWidth, $diaHeight) = @_;
-
-    # print coordinates along the bottom
-    if ($my->{coords}) {
-        my ($l, $r) = ($my->{leftLine}, $my->{rightLine});
-        $my->print(' ',
-        join('   ', (qw(A B C D E F G H J K L M N O P Q R S T U V W X Y Z))[($l - 1) .. ($r - 1)]), "\n");
-    }
 }
 
 # this one's pretty easy too

@@ -1,4 +1,4 @@
-# $Id: Dg2TeX.pm 143 2005-06-03 21:05:57Z reid $
+# $Id: Dg2TeX.pm 210 2007-07-05 02:00:09Z reid $
 
 #   Dg2TeX
 #
@@ -24,7 +24,7 @@ Games::Go::Dg2TeX - Perl extension to convert Games::Go::Diagrams to TeX
 use Games::Go::Dg2TeX
 
  my $dg2tex = B<Games::Go::Dg2TeX-E<gt>new> (options);
- my $tex = $gd2tex->convertDiagram($diagram);
+ my $tex = $dg2tex->convertDiagram($diagram);
 
 =head1 DESCRIPTION
 
@@ -58,7 +58,7 @@ our @EXPORT = qw(
 );
 
 BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 143 $' =~ /(\d+)/;
+    our $VERSION = sprintf "1.%03d", '$Revision: 210 $' =~ /(\d+)/;
 }
 
 ######################################################
@@ -68,45 +68,152 @@ BEGIN {
 #####################################################
 
 use constant TOPLEFT     => '<';
-use constant TOPRIGHT    => ',';
-use constant TOP         => '[';
-use constant BOTTOMLEFT  => '>';
+use constant TOPRIGHT    => '>';
+use constant TOP         => '(';
+use constant BOTTOMLEFT  => ',';
 use constant BOTTOMRIGHT => '.';
-use constant BOTTOM      => ']';
-use constant LEFT        => '(';
-use constant RIGHT       => ')';
+use constant BOTTOM      => ')';
+use constant LEFT        => '[';
+use constant RIGHT       => ']';
 use constant MIDDLE      => '+';
 use constant HOSHI       => '*';
 use constant EMPTY       => "\\0??";    # empty intersection
 use constant WHITE       => "\\- !";    # numberless white stone
 use constant BLACK       => "\\- @";    # numberless black stone
-use constant MARKEDWHITE => "\\- ;";    # marked white stone
-use constant MARKEDBLACK => "\\- :";    # marked black stone
+use constant CIR         => "\\- 1";    # circle
+use constant CIR_BLACK   => "\\- C";    # circled black stone
+use constant CIR_WHITE   => "\\- c";    # circled white stone
+use constant SQR         => "\\- 2";    # square
+use constant SQR_BLACK   => "\\- S";    # squared black stone
+use constant SQR_WHITE   => "\\- s";    # squared white stone
+use constant TRI         => "\\- 3";    # triangle
+use constant TRI_BLACK   => "\\- T";    # triangled black stone
+use constant TRI_WHITE   => "\\- t";    # triangled white stone
+use constant X           => "\\- 4";    # X-mark
+use constant X_BLACK     => "\\- X";    # Xed black stone
+use constant X_WHITE     => "\\- x";    # Xed white stone
 
+use constant COMMON_MACROS =>
+"% goWhiteInk changes from black to white ink, but it's not supported by
+%   all output drivers (notably pdftex).  Dg2TeX only uses it for long
+%   labels on black stones, so it may not matter...
+\\def\\goWhiteInk#1{\\special{color push rgb 1 1 1} {#1} \\special{color pop}}%
+% goLap is used to overlap a long label on a stone or intersection
+\\def\\goLap#1#2{\\setbox0=\\hbox{#1} \\rlap{#1} \\raise 2\\goTextAdj\\hbox to \\wd0{\\hss\\eightpoint{#2}\\hss}}%
+% goLapWhite overlaps like goLap, but also changes to white ink for the label
+\\def\\goLapWhite#1#2{\\setbox0=\\hbox{#1}\\rlap{#1}\\raise 2\\goTextAdj\\hbox to \\wd0{\\hss\\eightpoint\\goWhiteInk{#2}\\hss}}%
+% rc places right-hand side coordinates
+\\def\\rc#1{\\raise \\goTextAdj\\hbox to \\goIntWd{\\kern \\goTextAdj\\hss\\rm#1\\hss}}%
+% bc places bottom coordinates
+\\def\\bc#1{\\hbox to \\goIntWd{\\hss#1\\hss}}%
+\\lineskip=0pt
+\\parindent=0pt
+\\raggedbottom        % allow pages to end short (if next diagram doesn't fit)
+";
 use constant NORMAL_MACROS =>
-"\\magnification=1200
-\\input gooemacs
+"\\input gooemacs
 \\gool
-\\newdimen\\diagdim
-\\newdimen\\fulldim
-\\newbox\\diagbox
-\\newbox\\captionbox\n";
+\\newbox\\boardBox        % a box to put the board into
+\\newbox\\floatBox
+\\newdimen\\floatWd
+\\newdimen\\floatHt
+\\newdimen\\ftextWd       % width of text alongside float
+\\newif\\iffloatRight     % controls whether to float on left or right
+\\floatRighttrue         % starting default
+\\def\\floatLeft#1#2{     % text on the right side, float on the left
+    \\floatRightfalse \\float{#1}{#2}
+}
+\\def\\floatRight#1#2{    % text on the left side, float on the right
+    \\floatRighttrue \\float{#1}{#2}
+}
+% from http://www.tug.org/utilities/plain/cseq.html#vss-rp:
+\\def\\hcropmark(#1,#2,#3){% (x,y,width)   line from x,y to width
+     \\vbox to 0pt{%
+          \\kern #2\\hbox{%
+               \\kern #1\\vrule height 0.1pt width #3%
+          }%
+          \\vss% \\vss is often used in a \\vbox to 0pt{}.
+     }%
+     \\ifvmode\\nointerlineskip\\fi%
+}
+\\def\\vcropmark(#1,#2,#3){% (x,y,height)   line from x,y to height
+     \\vbox to 0pt{%
+          \\kern #2\\hbox{%
+               \\kern #1\\vrule height #3 width 0.1pt%
+          }%
+          \\vss%
+     }%
+     \\ifvmode\\nointerlineskip\\fi%
+}
+\\def\\fbox(#1,#2,#3,#4){ %   (x, y, width, height)
+    \\begingroup
+    \\hcropmark(#1,#2,#3)
+    \\dimen0=#2
+    \\advance\\dimen0 #4
+    \\hcropmark(#1,\\dimen0,#3)
+    \\vcropmark(#1,#2,#4)
+    \\dimen0=#1
+    \\advance\\dimen0 #3
+    \\vcropmark(\\dimen0,#2,#4)
+    \\endgroup
+}
+\\def\\fbox(#1,#2,#3,#4){}%   (x, y, width, height)  % comment this line out to show outlines around floats
+% the float macro
+\\def\\float#1#2{%
+    \\setbox\\floatBox=\\vbox{#1}          % insert float into box
+    \\floatWd=\\wd\\floatBox               % width of float, add gap between text and float
+    \\floatHt=\\ht\\floatBox
+    \\advance\\floatHt \\dp\\floatBox       % height plus depth of float
+    \\vskip 0pt plus \\floatHt \\penalty-60 \\vskip 0pt plus -\\floatHt% make sure there's enough vertical space for the full diagram
+    \\ftextWd=\\hsize                     % width of text alongside float
+    \\global\\advance\\ftextWd -\\floatWd   % total width - (float width)
+    \\iffloatRight \\fbox(\\ftextWd,0pt,\\floatWd,\\floatHt)%
+    \\else         \\fbox(0pt,0pt,\\floatWd,\\floatHt)%
+    \\fi
+    \\vbox to 0pt{%
+       \\iffloatRight
+            \\moveright\\ftextWd% move right to where float should be
+       \\fi
+       \\hbox{\\tolerance=10000\\hbadness=10000%
+            \\box\\floatBox       % place the float - leave boxed to prevent page-breaks in the middle
+       }
+       \\vss
+    }
+    \\advance\\floatHt \\baselineskip     % add padding below float
+    \\setbox\\floatBox=\\vbox{%                % box for text
+        \\tolerance=10000\\hbadness=10000
+        \\advance\\floatWd 3em                % add gap to float width
+        \\global\\advance\\ftextWd -3em        % and remove it from text width
+        \\iffloatRight \\hangindent -\\floatWd % indent right side
+        \\else         \\hangindent  \\floatWd % indent left side
+        \\fi
+        \\hangafter=\\floatHt
+        \\advance \\hangafter \\baselineskip    % round up to nearest line
+        \\advance \\hangafter -1               % round up to nearest line
+        \\divide\\hangafter -\\baselineskip
+        \\vskip\\goIntHt \\vskip -\\goTextAdj \\noindent#2%            % place the text
+    }
+    \\dimen255=\\ht\\floatBox \\advance\\dimen255 \\dp\\floatBox  % text height
+    \\unvbox\\floatBox
+    \\ifdim\\dimen255 < \\floatHt       % is text shorter than float height?
+        \\advance\\floatHt -\\dimen255  % float height minus text height
+        \\kern\\floatHt                % get down to the bottom of the float
+    \\fi
+}
+";
 
 use constant SIMPLE_MACROS =>
-"\\magnification=1200
-\\input gooemacs
-\\raggedbottom
+"\\input gooemacs
 \\parindent=0pt\n";
 
 use constant TWO_COLUMN_MACROS =>
-"\\magnification=1200
-\\input gotcmacs
-\\raggedbottom
-\\tolerance=10000
-\\parindent=0pt\n";
+"\\input gotcmacs
+\\tolerance=10000\n";
 
 our %options = (
-    boardSize       => 19,
+    mag             => 1000,
+    boardSizeX      => 19,
+    boardSizeY      => 19,
     doubleDigits    => 0,
     topLine         => 1,
     bottomLine      => 19,
@@ -119,13 +226,12 @@ our %options = (
     file            => undef,
     filename        => 'unknown',
     print           => sub { return; }, # Hmph...
-    longComments    => 0,
     simple          => 0,
     twoColumn       => 0,
     coords          => 0,
     bigFonts        => 0,
     texComments     => 0,
-    gap             => 12,
+    floatControl    => 'rx',    # float right (text left), then random
     );
 
 ######################################################
@@ -146,7 +252,8 @@ A B<new> Games::Go::D2TeX takes the following options:
 
 =over 4
 
-=item B<boardSize> =E<gt> number
+=item B<boardSizeX> =E<gt> number
+=item B<boardSizeY> =E<gt> number
 
 Sets the size of the board.
 
@@ -186,6 +293,8 @@ Default:
           $x = chr($x - 1 + ord('a')); # convert 1 to 'a', etc
           $y = chr($y - 1 + ord('a'));
           return("$x$y"); },           # concatenate two letters
+
+See also the B<diaCoords> method below.
 
 =item B<file> =E<gt> 'filename' | $descriptor | \$string | \@array
 
@@ -230,35 +339,23 @@ part of the TeX diagram source.
 
 =over 4
 
-=item B<longComments> =E<gt> true | false
-
-In its default usage, the comments to each diagram comprise an unbreakable
-vbox---they must all appear on one page. This can cause problems if the
-comments are very extensive. This option generates more complicated TeX macros
-which allow the comments to be broken across pages. This option may not
-be used with B<-simple> or B<-longComments>.
-
-Default: true
-
 =item B<simple> =E<gt> true | false
 
 This generates very simple TeX which may not look so good on the page,
-but is convenient if you intend to edit the TeX. This option should
-not be used with B<-longComments>.
+but is convenient if you intend to edit the TeX.
 
 Default: false
 
 =item B<twoColumn> =E<gt> true | false
 
 This generates a two-column format using smaller fonts. This
-option forces B<simple> true, and it may not be used with
-B<-longComments> or B<-coords>.
+option forces B<simple> true.
 
 Default: false
 
 =item B<coords> =E<gt> true | false
 
-Generates a coordinate grid. This option may not be used with B<-twoColumn>.
+Adds coordinates to right and bottom edges.
 
 Default: false
 
@@ -275,9 +372,19 @@ are replaced by [, ] and /, since TeX roman fonts do not have these
 characters. If this option is used, these substitutions are not made, so you
 can embed TeX source (like {\bf change fonts}) directly inside the comments.
 
-=item B<gap> =E<gt> number of points
+=item B<floatControl> =E<gt> controls which side diagrams will float on
 
-The B<gap> in points between diagrams.
+B<floatControl> is a string that controls which side diagrams floats on.
+An 'l' puts the diagram on the left side (text on the right), 'r' puts the
+diagram on the right side, 'a' alternates, and any other character places
+the diagram randomly.  The first character is for the first diagram, second
+character is for the second diagram, and so on. When there is only one
+character left, that character controls all remaining diagrams.
+
+B<floatControl> is used only during 'normal' formatting.  It is not used
+with 'simple' or 'twoColumn' formats.
+
+Default: 'rx'    # first diagram on the right, all others are random
 
 Default: 12
 
@@ -285,12 +392,7 @@ Default: 12
 
 =head2 Interactions between options
 
-If B<coords> and B<twoColumn> are both true, Dg2TeX warns and
-turns off B<coords>.  If B<longComments> and B<simple> are both
-true, warns and turns off B<longComments>.  If B<longComments>
-and B<twoColumn> are both true, warns and turns off
-B<longComments>.  Finally, if B<twoColumn> is true, turns
-B<simple> on (no warning).
+If B<twoColumn> is true, B<simple> is turned on (no warning).
 
 =cut
 
@@ -346,30 +448,31 @@ sub configure {
         croak("I don't understand option $_\n") unless (exists($options{$_}));
         $my->{$_} = $args{$_};  # transfer user option
     }
-    if ($my->{coords} and
-        $my->{twoColumn}) {
-        carp("\nWarning: -coords and -twoColumn cannot be used together - turning off coords.");
-        delete($my->{coords});
-    }
-    if ($my->{longComments} and
-        $my->{simple}) {
-        carp("\nWarning: -longComments and -simple cannot be used together - turning off longComments.");
-        delete($my->{longComments});
-    }
-    if ($my->{longComments} and
-        $my->{twoColumn}) {
-        carp("\nWarning: -longComments and -twoColumn cannot be used together - turning off -longComments.");
-        delete($my->{longComments});
-    }
     if ($my->{twoColumn}) {
         $my->{simple} = 1;
     }
     $my->{fontSize} = ($my->{twoColumn}) ? 10 : 12;
     # make sure edges of the board don't exceed boardSize
-    $my->{topLine}    = 1 if ($my->{topLine} < 1);
     $my->{leftLine}   = 1 if ($my->{leftLine} < 1);
-    $my->{bottomLine} = $my->{boardSize} if ($my->{bottomLine} > $my->{boardSize});
-    $my->{rightLine}  = $my->{boardSize} if ($my->{rightLine} > $my->{boardSize});
+    $my->{topLine}    = 1 if ($my->{topLine} < 1);
+    $my->{rightLine}  = $my->{boardSizeX} if ($my->{rightLine} > $my->{boardSizeX});
+    $my->{bottomLine} = $my->{boardSizeY} if ($my->{bottomLine} > $my->{boardSizeY});
+}
+
+=item my $coord = $dg2mp-E<gt>B<diaCoords> ($x, $y)
+
+Provides access to the B<diaCoords> option (see above).  Returns
+coordinates in the converter's coordinate system for board coordinates ($x,
+$y).  For example, to get a specific intersection structure:
+
+    my $int = $diagram->get($dg2mp->diaCoords(3, 4));
+
+=cut
+
+sub diaCoords {
+    my ($my, $x, $y) = @_;
+
+    return &{$my->{diaCoords}}($x, $y);
 }
 
 =item $dg2tex-E<gt>B<print> ($tex ? , ... ?)
@@ -386,6 +489,8 @@ sub print {
     # one-time init:
     unless(exists($my->{macrosDone})) {
         $my->{macrosDone} = 1;
+        $my->print("\\magnification=$my->{mag}\n");
+        $my->print(COMMON_MACROS);
         if (not $my->{simple}) {
             $my->print(NORMAL_MACROS);
         } elsif ($my->{twoColumn}) {
@@ -445,7 +550,6 @@ In any case, the TeX source is returned as a string scalar.
 sub convertDiagram {
     my ($my, $diagram) = @_;
 
-    $my->convertProperties($diagram->property(0));      # any game-level properties?
     my @name = $diagram->name;
     $name[0] = 'Unknown Diagram' unless(defined($name[0]));
     my $propRef = $diagram->property;                   # get property list for the diagram
@@ -467,45 +571,12 @@ sub convertDiagram {
     } else {
         # carp("Hmmm! No numbered moves in $name[0]");
     }
+
     $my->print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n");
     $my->print("%  Start of ", @name, "$range\n");
     $my->print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n");
 
-    if (exists($propRef->{0}{N})) {
-        $range .= "\n\n$propRef->{0}{N}";       # node name
-    }
-    # get some measurements based on font size
-    my ($h, $w) = (($my->{bottomLine} - $my->{topLine} + 1), ($my->{rightLine} - $my->{leftLine} + 1));
-    my $diaHeight = (1 + .2 * $my->{bigFonts}) * ($my->{fontSize} * $h + $my->{gap});
-    my $diaWidth = $my->{fontSize} * (1 + .2 * $my->{bigFonts}) * $w;
-    if ($my->{coords}) {
-        $diaWidth += 15;
-        $diaHeight += 15;
-    }
-    # figure out whether we need odd or even parity for this diagram
-    delete($my->{goFont});
-    foreach my $y ($my->{topLine} .. $my->{bottomLine}) {
-        foreach my $x ($my->{leftLine} ..  $my->{rightLine}) {
-            my $int = $diagram->get(&{$my->{diaCoords}}($x, $y));
-            if (exists($int->{number})) {
-                $my->_intersectionFont($int);   # to set goFont
-            }
-            last if (exists($my->{goFont}));
-        }
-        last if (exists($my->{goFont}));
-    }
-    $my->{goFont} = 'goo' unless (exists($my->{goFont}));
-    $my->_preamble($diaHeight, $diaWidth);
-    foreach my $y ($my->{topLine} .. $my->{bottomLine}) {
-        foreach my $x ($my->{leftLine} ..  $my->{rightLine}) {
-            $my->_TeXifyIntersection($diagram, $x, $y);
-        }
-        if ($my->{coords}) {    # right-side coords
-            $my->print("\\raise 3pt\\hbox to 15pt{\\hglue5pt\\rm ", $my->{boardSize} - $y + 1, "\\hfil}");
-        }
-        $my->print("\n");
-    }
-    # print the coordinates and diagram title
+    # adjust diagram title
     $name[0] = "{\\bf $name[0]}";      # boldface the first name line
     if (defined($diagram->var_on_move) and
         defined($diagram->parent)) {
@@ -520,23 +591,83 @@ sub convertDiagram {
                         $parentName;
         }
     }
-    $my->_interlude(join('', @name, $range), $diaWidth, $diaHeight);
 
+    # figure out whether we need odd or even parity for this diagram
+    delete($my->{goFont});
+    foreach my $y ($my->{topLine} .. $my->{bottomLine}) {
+        foreach my $x ($my->{leftLine} ..  $my->{rightLine}) {
+            my $int = $diagram->get($my->diaCoords($x, $y));
+            if (exists($int->{number})) {
+                $my->_intersectionFont($int);   # to set goFont
+            }
+            last if (exists($my->{goFont}));
+        }
+        last if (exists($my->{goFont}));
+    }
+    $my->{goFont} = 'goo' unless (exists($my->{goFont}));
+
+    # prepare TeX for the diagram
+    $my->_diagram_preamble();
+    # lay out the board
+    $my->_board_preamble();
+    foreach my $y ($my->{topLine} .. $my->{bottomLine}) {
+        $my->print("\\hbox{");
+        foreach my $x ($my->{leftLine} ..  $my->{rightLine}) {
+            $my->_TeXifyIntersection($diagram, $x, $y);
+        }
+        if ($my->{coords}) {    # right-side coords
+            $my->print("\\rc{", $diagram->ycoord($y), "}");
+        }
+        $my->print("}\n");
+    }
+    # print coordinates along the bottom
+    if ($my->{coords}) {
+        $my->print("\\vskip 4pt\n");
+        $my->print("\\hbox{");
+        for ($my->{leftLine} .. $my->{rightLine}) {
+            $my->print("\\bc ", $diagram->xcoord($_));
+        }
+        $my->print("}");
+    }
+    $my->_board_postamble();
+    # format the diagram caption
+    $my->_caption(join('', @name, $range));
+    # finish the diagram portion
+    $my->_diagram_postamble();
+
+    # prepare the text section
+    $my->_text_preamble(join('', @name, $range));
+    # if this is the first diagram, print the game inforamation
+    unless(exists($my->{titleDone})) {      # first diagram only:
+        $my->{titleDone} = 1;
+        my @title_lines = $diagram->gameProps_to_title(sub { "{\\bf $_[0]}" });
+        my $title = '';
+        foreach (@title_lines) {
+            s/(.*?})(.*)/$1 . $my->convertText($2)/e;
+            $title .= "$_\\hfil\\break\n";
+        }
+        if($title ne '') {
+            $my->print("$title\\hfil\\break\n\\hfil\\break\n");
+        }
+    }
     # deal with the over-lay stones
     $my->_TeXifyOverstones($diagram);
-    if ($my->{twoColumn}) {
-        $my->print("}\n");
-    } else { 
-        $my->print("\\hfil\\break\n");
-    }
     # print the game comments for this diagram
+    if (($my->{twoColumn}) or ($my->{simple})) {
+        $my->print("\\hfil\\break\n");  # some space after caption or overstones
+    }
     foreach my $n (sort { $a <=> $b } keys(%{$propRef})) {
         my @comment;
-        if ((exists($propRef->{$n}{B}) and
-             ($propRef->{$n}{B}[0] eq 'tt')) or
-            (exists($propRef->{$n}{W}) and
-             ($propRef->{$n}{W}[0] eq 'tt'))) {
-            push(@comment, "Pass\n\n");
+        if (exists($propRef->{$n}{B}) and
+            ($propRef->{$n}{B}[0] eq 'pass')) {
+            push(@comment, "Black Pass\n\n");
+        }
+        if (exists($propRef->{$n}{W}) and
+             ($propRef->{$n}{W}[0] eq 'pass')) {
+            push(@comment, "White Pass\n\n");
+        }
+        if (exists($propRef->{$n}{N})) {
+            push(@comment, "$propRef->{$n}{N}[0]\n"); # node name
         }
         if (exists($propRef->{$n}{C})) {
             push(@comment, @{$propRef->{$n}{C}});
@@ -548,142 +679,39 @@ sub convertDiagram {
                                 ($n >= $first) and
                                 ($n <= $last));
             $c .= join('', @comment);
-            $my->print($my->TeXifyText($c));
+            $my->print($my->convertText($c), "\\hfil\\break\n");
         }
     }
-    $my->_postamble();
+    # finish the text portion
+    $my->_text_postamble();
 }
 
-=item my $tex = $dg2tex-E<gt>B<TeXifyText> ($text)
+=item my $tex = $dg2tex-E<gt>B<convertText> ($text)
 
 Converts $text into TeX code by changing certain characters that are
 not available in TeX cmr10 font, and by converting \n\n into
-\hfil\break.  B<TeXifyText> behavior is modified by B<texComments>
+\hfil\break.  B<convertText> behavior is modified by B<texComments>
 and B<simple> options.
 
 Returns the converted text.
 
 =cut
 
-sub TeXifyText {
+sub convertText {
     my ($my, $text) = @_;
 
     if ($my->{texComments}) {
         $text =~ tr/<>_/[]-/            # \{} are untouched if texComments is true
     } else {
-        $text =~ s/\\/\//gs;            #  \\ -> / since cmr10 has no backslash
+        $text =~ s/\\/\//gm;            #  \\ -> / since cmr10 has no backslash
         $text =~ tr/{<>}_/[[]]-/;       #  cmr10 has no {<>}_ so substitute [[]]-
     }
-    $text =~ s/([&~^\$%#])/\\$1/gs;     #  escape &~^$%#
+    $text =~ s/([&~^\$%#])/\\$1/gm;     #  escape &~^$%#
 
-    if ($my->{simple}) {
-        $text .= "\n\n";                # just tack two newlines to the end
-    } else {
-        $text =~ s/\n(\s*\n)+/\n\\hfil\\break\n/gs;      # replace \n\n by \hfil\break
-        $text .= "\\hfil\\break\n"
+    unless ($my->{simple}) {
+        $text =~ s/\n/\\hfil\\break\n/gm;      # replace \n by \hfil\break
     }
     return($text);
-}
-
-=item $tex_title = $dg2tex-E<gt>B<convertProperties> (\%sgfHash)
-
-B<convertProperties> takes a reference to a hash of properties as
-extracted from an SGF file.  Each hash key is a property ID and the
-hash value is a reference to an array of property values:
-$hash->{propertyId}->[values].  The following SGF properties are
-recognized:
-
-=over 4
-
-=item GN GameName
-
-=item EV EVent
-
-=item RO ROund
-
-=item PW PlayerWhite
-
-=item WR WhiteRank
-
-=item PB PlayerBlack
-
-=item BR BlackRank
-
-=item DT DaTe
-
-=item PC PlaCe
-
-=item GC GameComment
-
-=item KM KoMi
-
-=item RE REsult
-
-=item TM TiMe
-
-=back
-
-Both long and short property names are recognized, and all
-unrecognized properties are ignored with no warnings.  Note that
-these properties are all intended as game-level notations.
-
-=cut
-
-sub convertProperties {
-    my ($my, $hashRef) = @_;
-
-    return unless(defined($hashRef));
-    my %hash;
-    foreach my $key (keys(%{$hashRef})) {
-        my $short = $key;
-        $short =~ s/[^A-Z]//g;                  # delete everything but upper case letters
-        $hash{$short} = join('', @{$hashRef->{$key}});
-    }
-
-    my @lines;
-    push(@lines, $hash{GN}) if(exists($hash{GN}));      # GameName
-    if (defined($hash{EV})) {
-        if (defined($hash{RO})) {
-            push(@lines, "$hash{EV} - Round $hash{RO}");# EVent name and ROund number
-        } else {
-            push(@lines, $hash{EV});                    # EVent
-        }
-    }
-    if (defined($hash{PW})) {
-        if(defined($hash{WR})) {
-            push(@lines, "{\\bf White:} $hash{PW} $hash{WR}");  # PlayerWhite and WhiteRank
-        } else {
-            push(@lines, "{\\bf White:} $hash{PW}");            # PlayerWhite
-        }
-    }
-    if (defined($hash{PB})) {
-        if(defined($hash{BR})) {
-            push(@lines, "{\\bf Black:} $hash{PB} $hash{BR}");  # PlayerBlack and BlackRank
-        } else {
-            push(@lines, "{\\bf Black:} $hash{PB}");            # PlayerBlack
-        }
-    }
-    push(@lines, $hash{DT}) if (defined($hash{DT}));            # DaTe
-    push(@lines, $hash{PC}) if (defined($hash{PC}));            # PlaCe
-    push(@lines, $hash{GC}) if (defined($hash{GC}));            # GameComment
-    if (defined($hash{KM})) {                                   # komi
-        if ($hash{KM} =~ m/(\d+\.\d+?)0*$/) {
-            # remove ugly trailing zeros supplied by IGS
-            $hash{KM} = $1;
-        }
-        push(@lines, "{\\bf Komi}: $hash{KM}");
-    }
-    push(@lines, "{\\bf Result}: $hash{RE}") if (defined($hash{RE}));   # result
-    push(@lines, "{\\bf Time}: $hash{TM}") if (defined($hash{TM}));     # time constraints
-    my ($title)='';
-    foreach my $line (@lines) {
-        next unless (defined($line));
-        $line =~ s/\\([][)(\\])/$1/g;                           # change escaped chars to non-escaped
-        $title .= "$line\\hfil\\break\n";
-    }
-    if($title ne '') {
-        $my->print("{\\noindent\n$title\\vfil}\n\\nobreak\n");
-    }
 }
 
 =item $dg2tex-E<gt>B<close>
@@ -709,23 +737,33 @@ sub close {
 #       Private methods
 #
 #####################################################
-
+# this method prints the stones in the text alongside the diagram that indicate
+# over-lay stones ("24, 36 at 44" or "13, 15 at triangled stone", etc)
 sub _TeXifyOverstones {
     my ($my, $diagram) = @_;
 
-    my @tex;
     my $textFont = $my->{bigFont} ? "\\bigtextstone" : " \\textstone";     # choose font
 
+    my $group_preamble;
+    my $group_postamble;
+    if ($my->{simple} or $my->{twocolumn}) {
+        $group_preamble = '\\nobreak';
+        $group_postamble = "\\hfil\\break\n";
+    } else {
+        $group_preamble = "\\nobreak\\vbox{\\hsize=\\ftextWd \\baselineskip=\\goIntHt \\advance\\baselineskip 3pt\\noindent\\iffloatRight\\hfil\\fi\n";
+        $group_postamble = "\\iffloatRight\\else\\hfil\\fi\\break\\vskip -8pt}\n";
+    }
     foreach my $int (@{$diagram->getoverlist()}) {
-        my $overStones = '';
+        my $overStones = $group_preamble;
         for(my $ii = 0; $ii < @{$int->{overstones}}; $ii += 2) {
             # all the overstones that were put on this understone:
             my $overColor = $int->{overstones}[$ii];
             my $overNumber = $int->{overstones}[$ii+1];
-            $overStones .= "\}, " if ($overStones ne '');
+            $overStones .= ", " if ($overStones ne $group_preamble);
             local $my->{stoneOffset} = $my->{offset};
             $my->_stoneFont($overColor, $overNumber);   # make sure font is right
-            $overStones .= sprintf("$textFont\{\\$my->{goFont}\\%03d=", $my->_checkStoneNumber($overNumber));
+            $overStones .= sprintf("$textFont\{\\$my->{goFont}\\%03d=\}", $my->_checkStoneNumber($overNumber));
+            $overStones .= "\n" if ($ii % 4 == 3);
         }
         my $atStone = '';
         if (exists($int->{number})) {
@@ -735,25 +773,26 @@ sub _TeXifyOverstones {
             unless (exists($int->{mark})) {
                 my $mv = '';
                 $mv .= " black node=$int->{black}" if (exists($int->{black}));
-                $mv .= " white node=$int->{white}" if (exists($int->{black}));
+                $mv .= " white node=$int->{white}" if (exists($int->{white}));
                 carp("Oops: understone$mv is not numbered or marked? " .
                      "This isn't supposed to be possible!");
             }
+            my $color;
             if (exists($int->{black})) {
-                $atStone = "\\- ::";            # marked black stone in text
+                $color = 'black';               # marked black stone in text
             }elsif (exists($int->{white})) {
-                $atStone = "\\- ;;";            # marked white stone in text
+                $color = 'white';               # marked white stone in text
             } else {
                 carp("Oops: understone is not black or white? " .
                      "This isn't supposed to be possible!");
             }
+            $atStone = $my->_drawMark($int->{mark}, $color);
+            $atStone .= substr($atStone, length($atStone) - 1, 1);  # dup last char
         }
         $atStone = "$textFont\{\\$my->{goFont}$atStone\}";
         # collect all the overstones in the diagram
-        push(@tex, "$overStones\} at $atStone");
+        $my->print("$overStones at $atStone$group_postamble");
     }
-    return '' unless(@tex);
-    $my->print(join(",\\hfil\\break\\break\n", @tex) . "\\hfil\\break\\break\n");
 }
 
 sub _checkStoneNumber {
@@ -774,27 +813,45 @@ sub _checkStoneNumber {
 sub _TeXifyIntersection {
     my ($my, $diagram, $x, $y) = @_;
 
-    my $int = $diagram->get(&{$my->{diaCoords}}($x, $y));
+    my $int = $diagram->get($my->diaCoords($x, $y));
     my $stone;
+    my $color;
+    my $label;
+    if (exists($int->{black})) {
+        $color = 'black';
+    } elsif (exists($int->{white})) {
+        $color = 'white';
+    }
     if (exists($int->{number})) {
         $stone = $my->_intersectionFont($int) . sprintf("\\%03d", $my->_checkStoneNumber($int->{number})); # numbered stone
     } elsif (exists($int->{mark})) {
-        if (exists($int->{black})) {
-            $stone = MARKEDBLACK;
-        }elsif (exists($int->{white})) {
-            $stone = MARKEDWHITE;
-        } else {
-            carp("Can't mark empty intersction");
-        }
+        $stone = $my->_drawMark($int->{mark}, $color);
     } elsif (exists($int->{label})) {
-        my $label = ((ord(lc($int->{label})) - ord('a')) % 26) + 401;
-        if (exists($int->{black})) {
-            $stone = sprintf("\\%03d", $label);         # black labels are 401 to 426
-        } elsif (exists($int->{white})) {
-            $stone = sprintf("\\%03d", $label + 100);   # white labels are 501 to 526
+        $label = $int->{label};
+        if ((length($label) > 1) or     # we only have single-letter labels available in the fonts
+            ord($label) < ord('A') or
+            ord($label) > ord('Z')) {
+            # OK, label probably won't fit.  Draw the stone or intersection
+            # and overlap the label.  for black stones use special to
+            # change font color to white (not supported in all display
+            # drivers, including pdftex - hope no one notices...)
+            # We'll do this at the end by leaving label defined here
+            if (exists($int->{white})) {
+                $stone = WHITE;
+            } elsif (exists($int->{black})) {
+                $stone = BLACK;
+            }
         } else {
-            $my->print("\\!  $int->{label}");           # no underneath for labeled intersections
-            return;
+            $label = ((ord(lc($int->{label})) - ord('a')) % 26) + 401;
+            if (exists($int->{black})) {
+                $stone = sprintf("\\%03d", $label);         # black labels are 401 to 426
+            } elsif (exists($int->{white})) {
+                $stone = sprintf("\\%03d", $label + 100);   # white labels are 501 to 526
+            } else {
+                $my->print("\\!  $int->{label}");           # no underneath for labeled intersections
+                return;
+            }
+            undef $label;       # label is handled, so we can undef it now
         }
     } elsif (exists($int->{white})) {
         $stone = WHITE;
@@ -802,16 +859,19 @@ sub _TeXifyIntersection {
         $stone = BLACK;
     }
 
-    if (defined($x) and defined($y)) {
-        if (defined($stone)) {
-            $stone .= $my->_underneath($x, $y);
+    unless (defined($stone)) {
+        $stone = EMPTY;       # empty intersection
+    }
+    if (exists($int->{hoshi})) {
+        $stone .= HOSHI;
+    } else {
+        $stone .= $my->_underneath($x, $y);
+    }
+    if (defined($label)) {      # need to overlap label on top of stone or intersection
+        if (exists($int->{black})) {
+            $stone = "\\goLapWhite{\\gooegb $stone}{$label}";    # draw label with white ink
         } else {
-            $stone = EMPTY;       # empty intersection
-            if (exists($int->{hoshi})) {
-                $stone .= HOSHI;
-            } else {
-                $stone .= $my->_underneath($x, $y);
-            }
+            $stone = "\\goLap{\\gooegb $stone}{$label}";
         }
     }
     $my->print($stone);
@@ -821,19 +881,43 @@ sub _TeXifyIntersection {
 sub _underneath {
     my ($my, $x, $y) = @_;
 
-    if ($x <= 1) {
-        return TOPLEFT if ($y <= 1);            # upper left corner
-        return TOPRIGHT if ($y >= $my->{boardSize}); # upper right corner
+    if ($y <= 1) {
+        return TOPLEFT if ($x <= 1);            # upper left corner
+        return TOPRIGHT if ($x >= $my->{boardSizeX}); # upper right corner
         return TOP;                             # upper side
-    } elsif ($x >= $my->{boardSize}) {
-        return BOTTOMLEFT if ($y <= 1);         # lower left corner
-        return BOTTOMRIGHT if ($y >= $my->{boardSize}); # lower right corner
+    } elsif ($y >= $my->{boardSizeY}) {
+        return BOTTOMLEFT if ($x <= 1);         # lower left corner
+        return BOTTOMRIGHT if ($x >= $my->{boardSizeX}); # lower right corner
         return BOTTOM;                          # lower side
     }
-    return LEFT if ($y <= 1);                   # left side
-    return RIGHT if ($y >= $my->{boardSize});   # right side
+    return LEFT if ($x <= 1);                   # left side
+    return RIGHT if ($x >= $my->{boardSizeX});   # right side
     return MIDDLE;                              # somewhere in the middle
 }
+
+# sort out what to use for marked stone or intersection
+my @mark_selection =
+    (CIR,       SQR,       TRI,       X,        # mark on empty intersection
+     CIR_BLACK, SQR_BLACK, TRI_BLACK, X_BLACK,  # mark on black stones
+     CIR_WHITE, SQR_WHITE, TRI_WHITE, X_WHITE); # mark on white stones
+sub _drawMark {
+    my ($my, $mark, $color) = @_;
+
+    my $idx = 3;                # default to the X mark column
+    if ($mark eq 'CR') {        # CR[pt]      circle
+        $idx = 0;               # circle column
+    } elsif ($mark eq 'SQ') {   # SQ[pt]      square
+        $idx = 1;               # square column
+    } elsif ($mark eq 'TR') {   # TR[pt]      triangle
+        $idx = 2;               # square column
+    }
+    if (defined($color)) {
+        $idx += 4;              # mark on black stones row
+        $idx += 4 if ($color eq 'white');   # white row
+    }
+    return($mark_selection[$idx]);
+}
+
 
 sub _intersectionFont {
     my ($my, $int) = @_;
@@ -846,7 +930,7 @@ sub _intersectionFont {
     }
     if (exists($int->{white})) {
         if (defined($color)) {
-            carp "intersction has both white and black stones!\n";
+            carp "intersection has both white and black stones!\n";
         }
         $color = 'white';
     }
@@ -871,74 +955,100 @@ sub _stoneFont {
     return("\\$font");
 }
 
-sub _preamble {
-    my ($my, $diaHeight, $diaWidth) = @_;
+sub _diagram_preamble {
+    my ($my) = @_;
 
     my $b = $my->{bigFonts} ? 'b' : ''; # 'b' modifer for bigFonts
-    my $vbox = sprintf("\\vbox to %3.1f pt{\\hsize= %3.1f pt", $diaHeight, $diaWidth);
     if ($my->{twoColumn}) {
-        $my->print(           "\\vbox{$vbox\\$my->{goFont}\n");
+        $my->print("\\vbox{\\vbox{\\$my->{goFont}\n");
     } elsif ($my->{simple}) {
-        $my->print(                  "$vbox\\$b$my->{goFont}\n");
+        $my->print("\\vbox{\\$b$my->{goFont}\n");
     } else {
-        $my->print("\\setbox\\diagbox=$vbox\\$b$my->{goFont}\n");
+        my $control = lc(substr($my->{floatControl}, 0, 1));
+        if ($control eq 'l') {
+            $my->{floatSide} = 'Left';
+        } elsif ($control eq 'r') {
+            $my->{floatSide} = 'Right';
+        } elsif ($control eq 'a') {
+            $my->{floatSide} = ($my->{floatSide} eq 'Right') ? 'Left' : 'Right';
+        } else {
+            $my->{floatSide} = (rand(2) < 1) ? 'Left' : 'Right';
+        }
+        if (length($my->{floatControl}) > 1) {
+            $my->{floatControl} = substr($my->{floatControl}, 1);   # chop off first char
+        }
+        $my->print("\\float$my->{floatSide}\{\\setbox\\boardBox");
     }
 }
 
-sub _interlude {
-    my ($my, $title, $diaWidth, $diaHeight) = @_;
+sub _board_preamble {
+    my ($my) = @_;
 
-    # print coordinates along the bottom
-    if ($my->{coords}) {
-        my ($l, $r) = ($my->{leftLine}, $my->{rightLine});
-        $my->print("\\vfil\n\\hbox{\\hglue3pt\\vbox{\\hsize=",
-                12 * ($r - $l + 1) * (1 + .2*$my->{bigFonts}),
-                " pt\\settabs",
-                $r - $l + 1,
-                "\\columns\\rm\n\\+",
-                substr("A&B&C&D&E&F&G&H&J&K&L&M&N&O&P&Q&R&S&T&U&V&W&X&Y&Z", 2 * ($l - 1),
-                                                                2 * ((($r <= 25) ? $r : 25) - $l) + 1),
-                "\\cr}\\hfil}\n\\vglue5pt");
+    if ($my->{twoColumn}) {
+    } elsif ($my->{simple}) {
+    } else {
+        my $b = $my->{bigFonts} ? 'b' : ''; # 'b' modifer for bigFonts
+        $my->print("\\vbox{\\$b$my->{goFont}\n");
     }
+}
+
+sub _board_postamble {
+    my ($my) = @_;
+
+    if ($my->{twoColumn}) {
+    } elsif ($my->{simple}) {
+    } else {
+        $my->print("}");
+    }
+    $my->print("\\smallskip\n");
+}
+
+sub _caption {
+    my ($my, $title) = @_;
+
     # print the diagram title
-    $diaWidth += 20;
-    if (($my->{twoColumn})or ($my->{simple})) {
-        $my->print("}\n$title\\hfil\\break\n");
+    if (($my->{twoColumn}) or ($my->{simple})) {
+        # put the title in the text instead of under the diagram
     } else {
-        my $hangIndentLines = int(1 + $my->{bigFonts} + ($diaHeight - (1+.2*$my->{bigFonts})*$my->{gap})/ $my->{fontSize});
-        $my->print("\\vfil}\n",
-                "\\setbox\\captionbox=\\vbox{\\tolerance=10000\\vglue-8pt\n",
-                "\\parindent=0pt\\parskip=8pt\\vglue6pt\\lineskip=0pt\\baselineskip=12pt\n",
-                "\\hangindent $diaWidth pt\\hangafter-$hangIndentLines\n",
-                "\\noindent$title\\hfil\\break\\hfil\\break\n");
+        $my->print("\\nobreak\\vbox{\\hsize=\\wd\\boardBox\n",
+                   "\\box\\boardBox\\rm\n",
+                   "{\\centerline{$title}}\n",
+                   "}");
     }
 }
 
-sub _postamble {
+sub _diagram_postamble {
+    my ($my) = @_;
+
+    if ($my->{twoColumn}) {
+        $my->print("}\n");
+    } elsif ($my->{simple}) {
+        $my->print("\\break\n");
+    } else {
+    }
+    $my->print("}\n");
+}
+
+sub _text_preamble {
+    my ($my, $title) = @_;
+
+    # print the diagram title
+    if (($my->{twoColumn}) or ($my->{simple})) {
+        $my->print("\\nobreak$title\\hfil\\break\n");
+    } else {
+        $my->print("{\\noindent\n");
+    }
+}
+
+sub _text_postamble {
     my ($my) = @_;
 
     if ($my->{twoColumn}) {
         $my->print("\n\n");
-    } elsif ($my->{longComments}) {
-        $my->print("\\par\\vfil}\n",
-                "\\diagdim=\\ht\\diagbox\n",
-                "\\ifdim\\ht\\captionbox>280pt\n",
-                "\\vbox to 280pt{\\box\\diagbox\\vglue-\\diagdim\\vsplit\\captionbox to 280pt}\n",
-                "\\nointerlineskip\\unvbox\\captionbox\n",
-                "\\else\n",
-                "\\ifdim\\ht\\captionbox>\\diagdim\\fulldim=\\ht\\captionbox\n",
-                "  \\else\\fulldim=\\diagdim\\fi\n",
-                "\\vbox to\\fulldim{\\box\\diagbox\\vglue-\\diagdim\\box\\captionbox}\n",
-                "\\fi\n\n");
     } elsif ($my->{simple}) {
         $my->print("\n\n");
     } else {
-        # not LongComments and not Simple
-        $my->print("\\par\\vfil}\n",
-                "\\diagdim=\\ht\\diagbox\n",
-                "\\ifdim\\ht\\captionbox>\\diagdim\\fulldim=\\ht\\captionbox\n",
-                "  \\else\\fulldim=\\diagdim\\fi\n",
-                "\\vbox to\\fulldim{\\box\\diagbox\\vglue-\\diagdim\\box\\captionbox}\n\n");
+        $my->print("}\n");
     }
 }
 

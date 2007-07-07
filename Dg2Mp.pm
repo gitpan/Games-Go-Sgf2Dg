@@ -1,4 +1,4 @@
-# $Id: Dg2Mp.pm 143 2005-06-03 21:05:57Z reid $
+# $Id: Dg2Mp.pm 176 2007-05-01 06:58:11Z reid $
 
 #   Dg2Mp
 #
@@ -70,58 +70,157 @@ our @EXPORT = qw(
 );
 
 BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 143 $' =~ /(\d+)/;
+    our $VERSION = sprintf "1.%03d", '$Revision: 176 $' =~ /(\d+)/;
 }
 
-use constant DEFAULT_FONT   => "cmssbx10";      # default font for numerals
-use constant BIGNUMBER_FONT => "cmr10";         # font for numbers > 99
-use constant ITALIC_FONT    => "cmbxti10";      # font for letters
-use constant MP_FUNCS  => "
-% how to draw a stone and a triangle:
-path stone, triangle;
-stone = fullcircle xscaled (stone_width) yscaled(stone_height);
-triangle = ((0, .45)--(.39, -.225)--(-.39,-.225)--cycle) xscaled (stone_width) yscaled (stone_height);
+use constant BLACK          => 'black';
+use constant WHITE          => 'white';
+use constant DEFAULT_FONT   => 'cmssbx10';      # default font for numerals
+use constant BIGNUMBER_FONT => 'cmr10';         # font for numbers > 99
+use constant ITALIC_FONT    => 'cmbxti10';      # font for letters
+use constant MP_FUNCS       => "
+
+% some global constants:
+numeric normal_pen, board_edge_pen,  mark_pen;
+normal_pen = 0.3;           % normal pen width
+board_edge_pen = normal_pen * 3.5;
+mark_pen = normal_pen * 2.5;
 
 % convert board coords to real coords:
 % note: goboard lines are numbered with 1 at the top and increasing
 %    towards the bottom of the page.  vline_count allows us to
 %    invert Y for PostScript coordinates that increase going up
-vardef boardXY (expr m, n) =
+def boardXY (expr m, n) =
    ((m - 0.5) * stone_width, (vline_count - n - 0.5) * stone_height)
 enddef;
 
-% white stone at m, n with label or number k
-vardef whitestone(expr m, n, k) =
-fill stone shifted boardXY(m, n) withcolor white;
-label(k, boardXY(m, n)) withcolor black;
-draw stone shifted boardXY(m, n);
+% how to draw basic shapes
+def _stone (expr m, n, color) =
+    fill fullcircle xscaled (stone_width) yscaled(stone_height) shifted boardXY(m, n) withcolor color;
+    draw fullcircle xscaled (stone_width) yscaled(stone_height) shifted boardXY(m, n);  % outline
 enddef;
 
-% black stone at m, n with label or number k
-vardef blackstone(expr m, n, k) =
-fill stone shifted boardXY(m, n) withcolor black;
-label(k, boardXY(m, n)) withcolor white;
+% triangle at m, n with color
+def _triangle (expr m, n, color) =
+    pickup pencircle scaled mark_pen;
+    draw  ((0, .45)--(.39, -.225)--(-.39,-.225)--cycle)
+        xscaled (stone_width) yscaled (stone_height)
+        shifted boardXY(m, n) withcolor color;
+    pickup pencircle scaled normal_pen;
 enddef;
 
-% black stone at m, n with triangle mark
-vardef triangleblackstone(expr m, n) =
-blackstone(m, n, \"\");
-draw triangle shifted boardXY(m, n) withcolor white;
+% square at m, n with color
+def _square (expr m, n, color) =
+    pickup pencircle scaled mark_pen;
+    draw  ((-.5, .5)--(.5, .5)--(.5, -.5)--(-.5, -.5)--cycle)
+        xscaled (stone_width * .5) yscaled (stone_height * .5)
+        shifted boardXY(m, n) withcolor color;
+    pickup pencircle scaled normal_pen;
 enddef;
 
-% white stone at m, n with triangle mark
-vardef trianglewhitestone(expr m, n) =
-whitestone(m, n, \"\");
-draw triangle shifted boardXY(m, n) withcolor black;
+% X mark at m, n with color
+def _mark(expr m, n, color) =
+    pickup pencircle scaled mark_pen;
+    draw  ((-.5, -.5)--(.5, .5))  xscaled (stone_width * .4) yscaled (stone_height * .4) shifted boardXY(m, n) withcolor color;
+    draw  ((-.5, .5)--(.5, -.5))  xscaled (stone_width * .4) yscaled (stone_height * .4) shifted boardXY(m, n) withcolor color;
+    pickup pencircle scaled normal_pen;
 enddef;
 
-% label an empty intersection at m, n with k
-vardef labelintersection(expr m, n, k) =
-% create some blank space under the label
-unfill stone scaled 0.6 shifted boardXY(m, n);
-label(k, boardXY(m, n)) withcolor black;
+% circle at m, n with color
+def _circle (expr m, n, color) =
+    pickup pencircle scaled mark_pen;
+    draw  fullcircle xscaled (stone_width * .5) yscaled (stone_height * .5) shifted boardXY(m, n) withcolor color;
+    pickup pencircle scaled normal_pen;
 enddef;
 
+% parts of the intersections of the board
+def _up    (expr coord) = draw (coord--(coord + (0,  .5 * stone_height))) enddef;
+def _down  (expr coord) = draw (coord--(coord + (0, -.5 * stone_height))) enddef;
+def _right (expr coord) = draw (coord--(coord + ( .5 * stone_width, 0)))  enddef;
+def _left  (expr coord) = draw (coord--(coord + (-.5 * stone_width, 0)))  enddef;
+
+def _int (expr m, n) =
+
+    pair coord;  % coords of point on board
+    coord = boardXY(m, n); 
+    if (m <= 1) :
+        if (n <= 1) :               % topLeft
+            pickup pencircle scaled board_edge_pen;
+            _right(coord);
+            _down(coord);
+        elseif (n >= b_sizey) :           % bottomLeft
+            pickup pencircle scaled board_edge_pen;
+            _right(coord);
+            _up(coord);
+        else :                      % left
+            _right(coord);
+            pickup pencircle scaled board_edge_pen;
+            _up(coord);
+            _down(coord);
+        fi;
+    elseif (m >= b_sizex):
+        if (n <= 1) :           % topRight
+            pickup pencircle scaled board_edge_pen;
+            _left(coord);
+            _down(coord);
+        elseif (n >= b_sizey) :     % bottomRight
+            pickup pencircle scaled board_edge_pen;
+            _left(coord);
+            _up(coord);
+        else :                      % right
+            _left(coord);
+            pickup pencircle scaled board_edge_pen;
+            _up(coord);
+            _down(coord);
+        fi;
+    else :
+        if (n <= 1) :               % top
+            _down(coord);
+            pickup pencircle scaled board_edge_pen;
+            _left(coord);
+            _right(coord);
+        elseif (n >= b_sizey) :     % bottom
+            _up(coord);
+            pickup pencircle scaled board_edge_pen;
+            _left(coord);
+            _right(coord);
+        else :                      % middle
+            _up(coord);
+            _down(coord);
+            _left(coord);
+            _right(coord);
+        fi;
+    fi;
+    pickup pencircle scaled normal_pen;
+enddef;
+
+% draw the board, given a global b_sizeX/Y and the
+%    left, right, top, and bottom boundry lines
+def _board (expr b_left, b_top, b_right, b_bottom) =
+    % place an illusory stone in upper left so the figures
+    %   line up after stones are on the edges
+    undraw fullcircle xscaled (stone_width) yscaled(stone_height) shifted boardXY(b_left, b_top);
+    for m = b_top upto b_bottom:
+        for n = b_left upto b_right:
+            _int(m, n);     % draw the intersections
+        endfor;
+    endfor;
+enddef;
+
+% draw a hoshi point
+def _hoshi(expr m, n) =
+    fill fullcircle xscaled (stone_width / 20) yscaled(stone_height / 20) shifted boardXY(m, n);
+enddef;
+
+% create some blank space (like for under a label)
+def _blank(expr m, n) =
+    unfill fullcircle xscaled (stone_width * 0.7) yscaled(stone_height * 0.7) shifted boardXY(m, n);
+enddef;
+
+% label at m, n with k and color
+def _label(expr m, n, k, color) =
+    label(k, boardXY(m, n)) withcolor color;
+enddef;
 ";
 
 
@@ -132,7 +231,8 @@ enddef;
 #####################################################
 
 our %options = (
-    boardSize       => 19,
+    boardSizeX      => 19,
+    boardSizeY      => 19,
     doubleDigits    => 0,
     coords          => 0,
     topLine         => 1,
@@ -191,7 +291,8 @@ A B<new> Games::Go::Dg2Mp takes the following options:
 
 =over 4
 
-=item B<boardSize> =E<gt> number
+=item B<boardSizeX> =E<gt> number
+=item B<boardSizeY> =E<gt> number
 
 Sets the size of the board.
 
@@ -251,10 +352,13 @@ same coordinates used in SGF format files.  You only need to define
 this if you're using a different coordinate system in the Diagram.
 
 Default:
+
     sub { my ($x, $y) = @_;
           $x = chr($x - 1 + ord('a')); # convert 1 to 'a', etc
           $y = chr($y - 1 + ord('a'));
           return("$x$y"); },           # concatenate two letters
+
+See also the B<diaCoords> method below.
 
 =item B<print> =E<gt> sub { my ($dg2mp, @tex) = @_; ... }
 
@@ -372,8 +476,24 @@ sub configure {
     # make sure edges of the board don't exceed boardSize
     $my->{topLine}    = 1 if ($my->{topLine} < 1);
     $my->{leftLine}   = 1 if ($my->{leftLine} < 1);
-    $my->{bottomLine} = $my->{boardSize} if ($my->{bottomLine} > $my->{boardSize});
-    $my->{rightLine}  = $my->{boardSize} if ($my->{rightLine} > $my->{boardSize});
+    $my->{rightLine}  = $my->{boardSizeX} if ($my->{rightLine} > $my->{boardSizeX});
+    $my->{bottomLine} = $my->{boardSizeY} if ($my->{bottomLine} > $my->{boardSizeY});
+}
+
+=item my $coord = $dg2mp-E<gt>B<diaCoords> ($x, $y)
+
+Provides access to the B<diaCoords> option (see above).  Returns
+coordinates in the converter's coordinate system for board coordinates ($x,
+$y).  For example, to get a specific intersection structure:
+
+    my $int = $diagram->get($dg2mp->diaCoords(3, 4));
+
+=cut
+
+sub diaCoords {
+    my ($my, $x, $y) = @_;
+
+    return &{$my->{diaCoords}}($x, $y);
 }
 
 =item $dg2mp-E<gt>B<print> ($tex ? , ... ?)
@@ -481,7 +601,8 @@ sub convertDiagram {
     $my->_createMp($diagram) unless(exists($my->{mpFile}));
     my @name = $diagram->name;
     $name[0] = 'Unknown Diagram' unless(defined($name[0]));
-    my $propRef = $diagram->property;                   # get property list for the diagram
+    my $propRef = $diagram->property;           # get property list for the diagram
+    $my->{VW} = exists($propRef->{0}{VW});      # view control?
     my $first = $diagram->first_number;
     my $last = $diagram->last_number;
     $my->{offset} = $diagram->offset;
@@ -500,34 +621,58 @@ sub convertDiagram {
     } else {
         # carp("Hmmm! No numbered moves in $name[0]");
     }
+
     $my->mpprint("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n");
     $my->mpprint("%  Start of ", @name, "$range\n");
     $my->mpprint("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n");
 
-    if (exists($propRef->{0}{N})) {
-        $range .= "\n\n$propRef->{0}{N}";       # node name
+    unless(exists($my->{titleDone})) {      # first diagram only:
+        $my->{titleDone} = 1;
+        my @title_lines = $diagram->gameProps_to_title(sub { "{\\bf $_[0]}" });
+        my $title = '';
+        foreach (@title_lines) {
+            s/(.*?})(.*)/$1 . $my->convertText($2)/e;
+            $title .= "$_\\hfil\\break\n";
+        }
+        if($title ne '') {
+            $my->print("{\\noindent\n$title\\par}\n\\nobreak\n");
+        }
     }
     $my->_preamble();
-    $my->mpprint("draw_board;\n");
+
+    if ($my->{VW}) {    # view control
+        $my->{draw_underneath} = 1;     # draw each intersection individually
+        $my->mpprint("% add illusory stone so figure is positioned correctly even if no stones are on the edges\n");
+        $my->mpprint("undraw fullcircle xscaled (stone_width) yscaled(stone_height) shifted boardXY($my->{leftLine}, $my->{topLine});\n");
+    } else {
+        # draw the underneath part (the board)
+        $my->mpprint("_board($my->{leftLine}, $my->{topLine}, $my->{rightLine}, $my->{bottomLine});\n");
+    }
+
+    # draw the diagram
     foreach my $y ($my->{topLine} .. $my->{bottomLine}) {
-        my $x;
-        for ($x = $my->{leftLine}; $x <= $my->{rightLine}; $x++) {
+        foreach my $x ($my->{leftLine} ..  $my->{rightLine}) {
             $my->_convertIntersection($diagram, $x, $y);
         }
         if ($my->{coords}) {    # right-side coords
-            my $coord = $my->{boardSize} - $y + 1;
-            $my->mpprint("label(\"$coord\", boardXY($x, $y)) withcolor black;\n");
+            my $x = $my->{rightLine} + 1;
+            my $ycoord = $diagram->ycoord($my->{rightLine} + 1);
+            $my->mpprint("_label($x, $y, \"$ycoord\", black);   % coord\n");
         }
     }
-    # the bottom coordinates
-    $my->_interlude();
+    # print coordinates along the bottom
+    if ($my->{coords}) {
+        $my->mpprint("% bottom coordinates:\n");
+        my $y = $my->{bottomLine} + 1;
+        for ($my->{leftLine} .. $my->{rightLine}) {
+            my $xcoord = $diagram->xcoord($_);
+            $my->mpprint("_label($_, $y, \"$xcoord\", black);\n");
+        }
+    }
     $my->mpprint("endfig;\n\n");
 
     # now handle text associated with this diagram
-    unless(exists($my->{titleDone})) {       # first diagram only:
-        $my->{titleDone} = 1;
-        $my->convertProperties($diagram->property(0));      # any game-level properties?
-    }
+    $my->print("\\hfil\\break\n");          # line break after the diagram
     # the diagram title
     $name[0] = "{\\bf $name[0]}";      # boldface the first name line
     if (defined($diagram->var_on_move) and
@@ -549,12 +694,14 @@ sub convertDiagram {
         $my->print("\n$title\\hfil\\break\n");
     } else {
         # BUGBUG my $hangIndentLines = int(1 + $my->{bigFonts} + ($diaHeight - (1+.2*$my->{bigFonts})*$my->{gap})/ $my->{fontSize});
-        $my->print("\\vfil\n",
-                "\\setbox\\captionbox=\\vbox{\\tolerance=10000\\vglue-8pt\n",
-                "\\parindent=0pt\\parskip=8pt\\vglue6pt\\lineskip=0pt\\baselineskip=12pt\n",
+        $my->print(
+       #        "\\vfil\n",
+       #        "\\setbox\\captionbox=\\vbox{\\tolerance=10000\\vglue-8pt\n",
+       #        "\\parindent=0pt\\parskip=8pt\\vglue6pt\\lineskip=0pt\\baselineskip=12pt\n",
        # BUGBUG "\\hangindent $diaWidth pt",
        # BUGBUG "\\hangafter-$hangIndentLines\n",
-                "\\noindent$title\\hfil\\break\\hfil\\break\n");
+       #        "\\hfil\\break\n",
+                "\\noindent$title\\hfil\\break\n");
     }
 
     # deal with the over-lay stones
@@ -562,16 +709,21 @@ sub convertDiagram {
     if ($my->{twoColumn}) {
         $my->print("\n");
     } else { 
-        $my->print("\\hfil\\break\n");
+        # $my->print("\\hfil\\break\n");
     }
     # print the game comments for this diagram
     foreach my $n (sort { $a <=> $b } keys(%{$propRef})) {
         my @comment;
-        if ((exists($propRef->{$n}{B}) and
-             ($propRef->{$n}{B}[0] eq 'tt')) or
-            (exists($propRef->{$n}{W}) and
-             ($propRef->{$n}{W}[0] eq 'tt'))) {
-            push(@comment, "Pass\n\n");
+        if (exists($propRef->{$n}{B}) and
+            ($propRef->{$n}{B}[0] eq 'pass')) {
+            push(@comment, "Black Pass\n\n");
+        }
+        if (exists($propRef->{$n}{W}) and
+             ($propRef->{$n}{W}[0] eq 'pass')) {
+            push(@comment, "White Pass\n\n");
+        }
+        if (exists($propRef->{$n}{N})) {
+            push(@comment, "$propRef->{$n}{N}[0]\n"); # node name
         }
         if (exists($propRef->{$n}{C})) {
             push(@comment, @{$propRef->{$n}{C}});
@@ -583,12 +735,12 @@ sub convertDiagram {
                                 ($n >= $first) and
                                 ($n <= $last));
             $c .= join('', @comment);
-            $my->print($my->convertText($c));
+            $my->print($my->convertText($c), $my->{simple} ? "\n" : "\\hfil\\break\n");
         }
     }
     if (($my->{twoColumn})or ($my->{simple})) {
     } else {
-        $my->print("}\n");
+        $my->print("\n");
     }
     $my->_postamble();
 }
@@ -610,119 +762,15 @@ sub convertText {
     if ($my->{texComments}) {
         $text =~ tr/<>_/[]-/            # \{} are untouched if texComments is true
     } else {
-        $text =~ s/\\/\//gs;            #  \\ -> / since cmr10 has no backslash
+        $text =~ s/\\/\//gm;            #  \\ -> / since cmr10 has no backslash
         $text =~ tr/{<>}_/[[]]-/;       #  cmr10 has no {<>}_ so substitute [[]]-
     }
-    $text =~ s/([&~^\$%#])/\\$1/gs;     #  escape &~^$%#
+    $text =~ s/([&~^\$%#])/\\$1/gm;     #  escape &~^$%#
 
-    if ($my->{simple}) {
-        $text .= "\n\n";                # just tack two newlines to the end
-    } else {
-        $text =~ s/\n(\s*\n)+/\n\\hfil\\break\n/gs;      # replace \n\n by \hfil\break
-        $text .= "\\hfil\\break\n"
+    unless ($my->{simple}) {
+        $text =~ s/\n/\\hfil\\break\n/gm;      # replace \n by \hfil\break
     }
     return($text);
-}
-
-=item $tex_title = $dg2mp-E<gt>B<convertProperties> (\%sgfHash)
-
-B<convertProperties> takes a reference to a hash of properties as
-extracted from an SGF file.  Each hash key is a property ID and the
-hash value is a reference to an array of property values:
-$hash->{propertyId}->[values].  The following SGF properties are
-recognized:
-
-=over 4
-
-=item GN GameName
-
-=item EV EVent
-
-=item RO ROund
-
-=item PW PlayerWhite
-
-=item WR WhiteRank
-
-=item PB PlayerBlack
-
-=item BR BlackRank
-
-=item DT DaTe
-
-=item PC PlaCe
-
-=item GC GameComment
-
-=item KM KoMi
-
-=item RE REsult
-
-=item TM TiMe
-
-=back
-
-Both long and short property names are recognized, and all
-unrecognized properties are ignored with no warnings.  Note that
-these properties are all intended as game-level notations.
-
-=cut
-
-sub convertProperties {
-    my ($my, $hashRef) = @_;
-
-    return unless(defined($hashRef));
-    my %hash;
-    foreach my $key (keys(%{$hashRef})) {
-        my $short = $key;
-        $short =~ s/[^A-Z]//g;                  # delete everything but upper case letters
-        $hash{$short} = join('', @{$hashRef->{$key}});
-    }
-
-    my @lines;
-    push(@lines, $hash{GN}) if(exists($hash{GN}));      # GameName
-    if (defined($hash{EV})) {
-        if (defined($hash{RO})) {
-            push(@lines, "$hash{EV} - Round $hash{RO}");# EVent name and ROund number
-        } else {
-            push(@lines, $hash{EV});                    # EVent
-        }
-    }
-    if (defined($hash{PW})) {
-        if(defined($hash{WR})) {
-            push(@lines, "{\\bf White:} $hash{PW} $hash{WR}");  # PlayerWhite and WhiteRank
-        } else {
-            push(@lines, "{\\bf White:} $hash{PW}");            # PlayerWhite
-        }
-    }
-    if (defined($hash{PB})) {
-        if(defined($hash{BR})) {
-            push(@lines, "{\\bf Black:} $hash{PB} $hash{BR}");  # PlayerBlack and BlackRank
-        } else {
-            push(@lines, "{\\bf Black:} $hash{PB}");            # PlayerBlack
-        }
-    }
-    push(@lines, $hash{DT}) if (defined($hash{DT}));            # DaTe
-    push(@lines, $hash{PC}) if (defined($hash{PC}));            # PlaCe
-    push(@lines, $hash{GC}) if (defined($hash{GC}));            # GameComment
-    if (defined($hash{KM})) {                                   # komi
-        if ($hash{KM} =~ m/(\d+\.\d+?)0*$/) {
-            # remove ugly trailing zeros supplied by IGS
-            $hash{KM} = $1;
-        }
-        push(@lines, "{\\bf Komi}: $hash{KM}");
-    }
-    push(@lines, "{\\bf Result}: $hash{RE}") if (defined($hash{RE}));   # result
-    push(@lines, "{\\bf Time}: $hash{TM}") if (defined($hash{TM}));     # time constraints
-    my ($title)='';
-    foreach my $line (@lines) {
-        next unless (defined($line));
-        $line =~ s/\\([][)(\\])/$1/g;                           # change escaped chars to non-escaped
-        $title .= "$line\\hfil\\break\n";
-    }
-    if($title ne '') {
-        $my->print("{\\noindent\n$title\\vfil}\n\\nobreak\n");
-    }
 }
 
 =item $dg2mp-E<gt>B<close>
@@ -770,49 +818,18 @@ sub _createMp {
                                 $fontScale * 5.0;     # need space for three digits
         $my->{stone_width} *= $my->{stone_fontSize};
     }
-    $my->{stone_height} = $my->{stone_width} * 1.05 unless(defined($my->{stone_height}));
-    $my->mpprint("defaultfont:=\"$my->{stone_fontName}\";\n",
+    $my->{stone_height} = $my->{stone_width} * 1.00 unless(defined($my->{stone_height}));
+    $my->mpprint("defaultfont  :=\"$my->{stone_fontName}\";\n",
                  "defaultscale := $my->{stone_fontSize}pt/fontsize defaultfont;\n",
-                 "numeric stone_width, stone_height, vline_count;\n",
-                 "stone_width = $my->{stone_width};\n",
-                 "stone_height = $my->{stone_height};\n",
-                 "vline_count = 1 + $my->{bottomLine} - $my->{topLine};\n",
+                 "numeric b_sizex, bsizey, stone_width, stone_height, vline_count;\n",
+                 "b_sizex      := $my->{boardSizeX};\n",
+                 "b_sizey      := $my->{boardSizeY};\n",
+                 "stone_width  := $my->{stone_width};\n",
+                 "stone_height := $my->{stone_height};\n",
+                 "vline_count  := 1 + $my->{bottomLine} - $my->{topLine};\n",
                  "\n",
                  );
     $my->mpprint(MP_FUNCS);         # meta-post prolog
-    $my->mpprint("% draw board\n",
-                 "vardef draw_board =\n",
-                 );
-    $my->mpprint("% draw hoshi points\n",
-                 "pickup pencircle scaled 1.5;\n",
-                 );
-    foreach my $y ($my->{topLine} .. $my->{bottomLine}) {
-        foreach my $x ($my->{leftLine} .. $my->{rightLine}) {
-            my $int = $diagram->get(&{$my->{diaCoords}}($x, $y));
-            if (exists($int->{hoshi})) {
-                $my->mpprint("drawdot (boardXY($x, $y));\n");
-            }
-        }
-    }
-    $my->mpprint("% draw lines\n",
-                 "pickup pencircle scaled 0.3;\n",
-                 );
-    my $left = $my->{leftLine};
-    $left -= 0.5 if ($my->{leftLine} != 1);
-    my $right = $my->{rightLine};
-    $right += 0.5 if ($my->{rightLine} != $my->{boardSize});
-    $my->mpprint("for i = $my->{topLine}  upto $my->{bottomLine}:\n",
-                 "    draw boardXY($left, i) -- boardXY($right, i);\n",
-                 "endfor\n",
-                 );
-    my $top = $my->{topLine};
-    $top -= 0.5 if ($my->{topLine} != 1);
-    my $bottom = $my->{bottomLine};
-    $bottom += 0.5 if ($my->{bottomLine} != $my->{boardSize});
-    $my->mpprint("for i = $my->{leftLine}  upto $my->{rightLine}:\n",
-                 "    draw boardXY(i, $top) -- boardXY(i, $bottom);\n",
-                 "endfor\n",
-                 "enddef;\n\n");
 }
 
 sub _convertOverstones {
@@ -820,7 +837,7 @@ sub _convertOverstones {
 
     return unless (@{$diagram->getoverlist});
 
-    my ($color, $number);
+    my ($color, $otherColor, $number);
     my $text_x = 0;
     my $text_y = $my->{bottomLine} + 1;
     $text_y++ if ($my->{coords});
@@ -835,19 +852,23 @@ sub _convertOverstones {
                 $my->print(', ');
             }
             $color = $int->{overstones}[$jj];
+            $otherColor = ($color eq BLACK) ? WHITE : BLACK;
             local $my->{stoneOffset} = $my->{offset};   # turn off doubleDigits
             $number = $my->_checkStoneNumber($int->{overstones}[$jj+1]);
             # draw the overstone
             $my->_preamble();    # start another figure
-            $my->mpprint("${color}stone(0, 0, \"$number\");\n");
+            $my->mpprint("_stone(0, 0, $color);\n");
+            $my->mpprint("_label(0, 0, \"$number\", $otherColor);\n");
             $my->mpprint("endfig;\n");
             $comma = 1;
         }
         # the 'at' stone
         if (exists($int->{black})) {
-            $color = 'black';
+            $color = BLACK;
+            $otherColor = WHITE;
         } elsif (exists($int->{white})) {
-            $color = 'white';
+            $color = WHITE;
+            $otherColor = BLACK;
         } else {
             carp("Oops: understone is not black or white? " .
                  "This isn't supposed to be possible!");
@@ -857,21 +878,23 @@ sub _convertOverstones {
         $my->print(' at ');
         # draw the at-stone
         $my->_preamble();    # start another figure
+        $my->mpprint("_stone(0, 0, $color);\n");
         if (exists($int->{number})) {
-            $my->mpprint("${color}stone(0, 0, \"$int->{number}\");\n");
+            $my->mpprint("_label(0, 0, \"$int->{number}\", $otherColor);\n");
         } elsif (exists($int->{mark})) {
-            $my->mpprint("triangle${color}stone(0, 0);\n");
+            $my->_drawMark($int->{mark}, $otherColor, 0, 0);
         } else {
             my $mv = '';
             $mv .= " black node=$int->{black}" if (exists($int->{black}));
-            $mv .= " white node=$int->{white}" if (exists($int->{black}));
+            $mv .= " white node=$int->{white}" if (exists($int->{white}));
             carp("Oops: understone$mv is not numbered or marked? " .
                  "This isn't supposed to be possible!");
         }
         $my->mpprint("endfig;\n");
         if ($ii < @{$diagram->getoverlist} - 1) {
-            $my->print(";\\hfil\\break\n");
+            $my->print(',');
         }
+        $my->print("\\hfil\\break\n");
     }
 }
 
@@ -893,39 +916,53 @@ sub _checkStoneNumber {
 sub _convertIntersection {
     my ($my, $diagram, $x, $y) = @_;
 
-    my $int = $diagram->get(&{$my->{diaCoords}}($x, $y));
+    my $int = $diagram->get($my->diaCoords($x, $y));
+    return if ($my->{VW} and            # view control AND
+               not exists($int->{VW})); # no view on this intersection
+    my $color = BLACK;
+    my $otherColor = BLACK;
+    if (exists($int->{black})) {
+        $otherColor = WHITE;
+        $my->mpprint("_stone($x, $y, $color);\n");
+    } elsif (exists($int->{white})) {
+        $color = WHITE;
+        $my->mpprint("_stone($x, $y, $color);\n");
+    } else {
+        if ($my->{draw_underneath}) {
+            # draw the appropriate intersection
+            $my->mpprint("_int($x, $y);\n");
+        }   # else the whole board underneath has already been drawn for us
+        if (exists($int->{hoshi})) {
+            $my->mpprint("_hoshi($x, $y);\n");
+        }
+        if (exists($int->{label}) or
+             exists($int->{number})) {
+            # clear some space at intersection for the number/label
+            $my->mpprint("_blank($x, $y);\n");
+        }
+    }
     if (exists($int->{number})) {
         my $num = $my->_checkStoneNumber($int->{number}); # numbered stone
-        if (exists($int->{black})) {
-            $my->mpprint("blackstone($x, $y, \"$num\");\n");
-        }elsif (exists($int->{white})) {
-            $my->mpprint("whitestone($x, $y, \"$num\");\n");
-        } else {
-            carp("Can't number an empty intersection at $x, $y");
-        }
+        $my->mpprint("_label($x, $y, \"$num\", $otherColor);\n");
     } elsif (exists($int->{mark})) {
-        if (exists($int->{black})) {
-            $my->mpprint("triangleblackstone($x, $y);\n");
-        }elsif (exists($int->{white})) {
-            $my->mpprint("trianglewhitestone($x, $y);\n");
-        } else {
-            carp("Can't triangle an empty intersection at $x, $y");
-        }
+        $my->_drawMark($int->{mark}, $otherColor, $x, $y);
     } elsif (exists($int->{label})) {
-        my $label = $int->{label};
-        if (exists($int->{black})) {
-            $my->mpprint("blackstone($x, $y, \"$label\");\n");
-        } elsif (exists($int->{white})) {
-            $my->mpprint("whitestone($x, $y, \"$label\");\n");
-        } else {
-            $my->mpprint("labelintersection($x, $y, \"$label\");\n");
-            return;
-        }
-    } elsif (exists($int->{black})) {
-            $my->mpprint("blackstone($x, $y, \"\");\n");
-    } elsif (exists($int->{white})) {
-            $my->mpprint("whitestone($x, $y, \"\");\n");
+        $my->mpprint("_label($x, $y, \"$int->{label}\", $otherColor);\n");
     }
+}
+
+sub _drawMark {
+    my ($my, $mark, $color, $x, $y) = @_;
+
+    my $func = '_mark';     # MA[pt]    default mark type
+    if ($mark eq 'TR') {        # TR[pt]      triangle
+        $func = '_triangle';
+    } elsif ($mark eq 'CR') {   # CR[pt]      circle
+        $func = '_circle';
+    } elsif ($mark eq 'SQ') {   # SQ[pt]      square
+        $func = '_square';
+    }
+    $my->mpprint("_$func($x, $y, $color)\n");
 }
 
 sub _preamble {
@@ -937,37 +974,24 @@ sub _preamble {
     $my->mpprint("beginfig($my->{mpfignum});\n");
 }
 
-sub _interlude {
-    my ($my) = @_;
-
-    # print coordinates along the bottom
-    if ($my->{coords}) {
-        $my->mpprint("% bottom coordinates:\n");
-        my $y = $my->{bottomLine} + 1;
-        for (my $x = $my->{leftLine}; $x <= $my->{rightLine}; $x++) {
-            last if($x > 24);  # missing I, so only 25 letters in horz coords
-            my $coord = substr("ABCDEFGHJKLMNOPQRSTUVWXYZ", ($x - 1), 1);
-            $my->mpprint("label(\"$coord\", boardXY($x, $y)) withcolor black;\n");
-        }
-    }
-}
-
 sub _postamble {
     my ($my) = @_;
 
     if ($my->{twoColumn}) {
         $my->print("\n\n");
     } elsif ($my->{longComments}) {
-        $my->print("\\par\\vfil\n",
-                "\\diagdim=\\ht\\diagbox\n",
-                "\\ifdim\\ht\\captionbox>280pt\n",
-                "\\vbox to 280pt{\\box\\diagbox\\vglue-\\diagdim\\vsplit\\captionbox to 280pt}\n",
-                "\\nointerlineskip\\unvbox\\captionbox\n",
-                "\\else\n",
-                "\\ifdim\\ht\\captionbox>\\diagdim\\fulldim=\\ht\\captionbox\n",
-                "  \\else\\fulldim=\\diagdim\\fi\n",
-                "\\vbox to\\fulldim{\\box\\diagbox\\vglue-\\diagdim\\box\\captionbox}\n",
-                "\\fi\n\n");
+        $my->print(
+               # "\\par\\vfil\n",
+               # "\\diagdim=\\ht\\diagbox\n",
+               # "\\ifdim\\ht\\captionbox>280pt\n",
+               # "\\vbox to 280pt{\\box\\diagbox\\vglue-\\diagdim\\vsplit\\captionbox to 280pt}\n",
+               # "\\nointerlineskip\\unvbox\\captionbox\n",
+               # "\\else\n",
+               # "\\ifdim\\ht\\captionbox>\\diagdim\\fulldim=\\ht\\captionbox\n",
+               # "  \\else\\fulldim=\\diagdim\\fi\n",
+               # "\\vbox to\\fulldim{\\box\\diagbox\\vglue-\\diagdim\\box\\captionbox}\n",
+               # "\\fi\n\n",
+                );
     } elsif ($my->{simple}) {
         $my->print("\n\n");
     } else {

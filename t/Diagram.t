@@ -40,16 +40,20 @@ isa_ok( $diagram, 'Games::Go::Diagram',         '   diagram is the right class' 
 is_deeply( $diagram->get('aa'), {
 },                                              'initial get(aa)' );
 is_deeply( $diagram->get('ba'), {
+    color => 'hoshi',
     hoshi => 1,
 },                                              'initial get(ba)' );
 is_deeply( $diagram->get('dd'), {
+    color => 'white',
     white => 1,
 },                                              'initial get(dd)' );
 is_deeply( $diagram->get('cd'), {
     hoshi => 1,
+    color => 'white',
     white => 1,
 },                                              'initial get(cd)' );
 is_deeply( $diagram->get('ab'), {
+    color => 'black',
     black => 1,
 },                                              'initial get(ab)' );
 is ( $diagram->put('ee', 'B', 3), 1,            'put black on ee' );
@@ -57,19 +61,22 @@ is_deeply( $diagram->get('ee'), {
 },                                              'get(ee) (pre-node)' );
 is ( $diagram->node, 2,                         'node 2' );
 is_deeply( $diagram->get('ee'), {
+    color => 'black',
     'black' => 1,
     'number' => 3
 },                                              'get(ee) (post-node)' );
-is ( $diagram->mark('ba'), 2,                   'mark ba' );
+is ( $diagram->mark('ba', 'TR'), 2,             'mark ba' );
 is ( $diagram->label('dd', 'w'), 2,             'mark dd' );
 is ( $diagram->node, 3,                         'node 3' );
 is_deeply( $diagram->get('ba'), {
     'hoshi' => 1,
-    'mark' => 2
+    color => 'hoshi',
+    'mark' => 'TR'
 },                                              'get(ba) (post-node)' );
 is_deeply( $diagram->get('dd'), {
     'label' => 'w',
     'w'     => 2,
+    color => 'white',
     'white' => 1,
 },                                              'get(dd) (post-node)' );
 is ( $diagram->label('ee', 'a'), 0,             'mark ee' );
@@ -93,6 +100,9 @@ is_deeply ( $diagram->clear, {
          'black' => 0,
          'label' => 'a' },
      },
+   'boardSizeX' => 19,
+   'boardSizeY' => 19,
+   'coord_style' => 'normal',
    'callback' => \&conflictCallback,
    'enable_overstones' => 1,
    'label' => {
@@ -100,6 +110,7 @@ is_deeply ( $diagram->clear, {
    'node' => 4,
    'overstone_eq_mark' => 1,
    'provisional' => 1,
+   'actions_done' => 0,
 },                                              'clear diagram' );
 is ( $diagram->renumber('cd', 'w', undef, 22), 1,
                                                 'renumber cd' );
@@ -119,7 +130,7 @@ is_deeply ( $diagram, {
          'number' => 22,
          'white' => 0 },
       'dd' => {
-         'mark' => 5,
+         'mark' => 'TR',
          'overstones' => [ 'black', 24],
          'white' => 0 },
       'ee' => {
@@ -127,25 +138,33 @@ is_deeply ( $diagram, {
          'black' => 0,
          'label' => 'a' },
      },
+   'boardSizeX' => 19,
+   'boardSizeY' => 19,
+   'coord_style' => 'normal',
    'callback' => \&conflictCallback,
    'enable_overstones' => 1,
    'label' => {
       'a' => 3 },
    'mark' => {
-      'white' => 5},
-   'marked_overstone' => {
-      'white' => 'dd'},
+      'DEFAULT_MARK' => {
+          'white' => 5},
+       },
+   'mark_count' => {
+      'DEFAULT_MARK' => {
+          'white' => 1},
+       },
    'node' => 6,
    'number' => {
       22 => 4,
       24 => 5},
    'overlist' => [  {
-         'mark' => 5,
+         'mark' => 'TR',
          'overstones' => [ 'black', 24],
          'white' => 0 },
        ],
    'overstone_eq_mark' => 1,
    'provisional' => 1,
+   'actions_done' => 1,
 },                                              'overstone' );
 
 ##

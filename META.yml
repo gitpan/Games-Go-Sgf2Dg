@@ -1,10 +1,10 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Games-Go-Sgf2Dg
-version:      4.026
-version_from: 
+version:      4.211
+version_from: sgf2dg
 installdirs:  site
 requires:
 
 distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.17
+generated_by: ExtUtils::MakeMaker version 6.30

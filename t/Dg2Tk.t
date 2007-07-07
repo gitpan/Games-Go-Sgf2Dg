@@ -51,7 +51,8 @@ eval { $dg2tk = Games::Go::Dg2Tk->new(
 is( $@, '',                                     'new Dg2Tk object'  );
 isa_ok( $dg2tk, 'Games::Go::Dg2Tk',             '   dg2tk is the right class'  );
 
-$dg2tk->configure(boardSize => 5,
+$dg2tk->configure(boardSizeX => 5, 
+                  boardSizeY => 5,
                   bg        => '#d2b48c');
 $dg2tk->convertDiagram($diagram);
 $dg2tk->{mw}->update;
@@ -60,12 +61,6 @@ eval {$dg2tk->comment(' comment')};
 is( $@, '',                                     'added comment' );
 $dg2tk->comment(' and more comment');
 is( $@, '',                                     'raw print' );
-$dg2tk->convertProperties({GN => ['GameName'],
-                            EV => ['EVent'],
-                            RO => ['ROund'],
-                            PW => ['PlayerWhite'],
-                            WR => ['WhiteRank'],
-                            C  => ['PlayerBlack', 'is not here']});
 $dg2tk->{mw}->update;
 $dg2tk->{mw}->after(500);
 $dg2tk->{mw}->destroy;

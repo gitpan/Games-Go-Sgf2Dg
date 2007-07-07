@@ -216,10 +216,12 @@ sub selectDir {
             print "    $ii. $dirs[$ii - 1]\n";
         }
         print "    $ii. Select a different directory\n";
-        print "\nPlease select one (or 'q' to quit): ";
+        print "    q. Quit\n";
+        print "\nPlease select one: [q] ";
         $rsp = <STDIN>;
         chomp $rsp;
-        die ("Quitting...\n") if (lc($rsp) eq 'q');
+        die ("Quitting...\n") if ((lc($rsp) eq 'q') or
+                                  (lc($rsp) eq ''));
     } while(not defined($rsp) or
             ($rsp == 0) or
             ($rsp =~ m/\D/) or
@@ -237,7 +239,8 @@ sub enter_directory {
         print "\nPlease enter directory name (or 'q' to quit): ";
         $rsp = <STDIN>;
         chomp $rsp;
-        die ("Quitting...\n") if (lc($rsp) eq 'q');
+        die ("Quitting...\n") if ((lc($rsp) eq 'q') or
+                                  (lc($rsp) eq ''));
         unless (-d $rsp) {
             print "\n$rsp is not a directory"
         }
