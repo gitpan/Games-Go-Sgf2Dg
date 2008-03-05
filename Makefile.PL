@@ -72,6 +72,7 @@ WriteMakefile(
     dist => { COMPRESS=>"gzip", SUFFIX=>"gz" },
 );
 
+$| = 1;             # autoflush STDOUT from now on
 editTexMakefile();      # edit Makefile in tex subdirectory
 editMakefile();         # make changes to Makefile just built by WriteMakefile()
 

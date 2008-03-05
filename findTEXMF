@@ -217,8 +217,7 @@ sub selectDir {
         }
         print "    $ii. Select a different directory\n";
         print "    q. Quit\n";
-        print "\nPlease select one: [q] ";
-        $rsp = <STDIN>;
+        $rsp = prompt("\nPlease select one: ", 'q');
         chomp $rsp;
         die ("Quitting...\n") if ((lc($rsp) eq 'q') or
                                   (lc($rsp) eq ''));
@@ -236,8 +235,7 @@ sub enter_directory {
 
     my $rsp;
     do {
-        print "\nPlease enter directory name (or 'q' to quit): ";
-        $rsp = <STDIN>;
+        $rsp = prompt("\nPlease enter directory name (or 'q' to quit): ", 'q');
         chomp $rsp;
         die ("Quitting...\n") if ((lc($rsp) eq 'q') or
                                   (lc($rsp) eq ''));

@@ -1,4 +1,4 @@
-# $Id: Dg2Mp.pm 176 2007-05-01 06:58:11Z reid $
+# $Id: Dg2Mp.pm 213 2008-02-25 08:19:31Z reid $
 
 #   Dg2Mp
 #
@@ -70,7 +70,7 @@ our @EXPORT = qw(
 );
 
 BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 176 $' =~ /(\d+)/;
+    our $VERSION = sprintf "1.%03d", '$Revision: 213 $' =~ /(\d+)/;
 }
 
 use constant BLACK          => 'black';
@@ -195,7 +195,7 @@ def _int (expr m, n) =
 enddef;
 
 % draw the board, given a global b_sizeX/Y and the
-%    left, right, top, and bottom boundry lines
+%    left, right, top, and bottom boundary lines
 def _board (expr b_left, b_top, b_right, b_bottom) =
     % place an illusory stone in upper left so the figures
     %   line up after stones are on the edges

@@ -53,12 +53,12 @@ use IO::File;
 use Games::Go::Diagram; # the go diagram module
 
 BEGIN {
-    our $VERSION = sprintf "4.%03d", '$Revision: 211 $' =~ /(\d+)/;
+    our $VERSION = sprintf "4.%03d", '$Revision: 215 $' =~ /(\d+)/;
 }
 
 use constant a_MINUS_1 => ord('a') - 1; # base of SGF coordinates is 'a'
 
-my $version = sprintf "version 4.%03d", '$Revision: 211 $' =~ /(\d+)/;
+my $version = sprintf "version 4.%03d", '$Revision: 215 $' =~ /(\d+)/;
 
 my $myName = $0;             # full pathname of this file
 $myName =~ s".*/"";          # delete any preceding path
@@ -88,11 +88,12 @@ $myName [options] [file.sgf]
     -av | -absoluteVarNums     move numbers in variation == main line numbers
     -cv | -correlativeVarNums  start main variations from 1 
     -rl | -repeatLast          repeat last move as first in next diagram
+    -ic | -ignoreComments      ignore SGF comments
     -il | -ignoreLetters       ignore SGF letters
     -im | -ignoreMarks         ignore SGF marks
     -iv | -ignoreVariations    ignore SGF variations
     -ip | -ignorePass          ignore SGF pass moves
-    -ia | -ignoreAll           ignore SGF letters, marks, variations, and passes
+    -ia | -ignoreAll           ignore SGF comments, letters, marks, variations, and passes
     -firstDiagram              first diagram to print
     -lastDiagram               last diagram to print
     -placeHandi                place handicap stones on board (old style)
@@ -511,9 +512,11 @@ sub SGF_ProcessProperty {
             $diagram->property($moveNum, $shortPropID, $propVal)
     # Node annotation properties
         } elsif ($shortPropID eq 'C') {         # C[text]     Comment
-            if ($propVal =~ m/\S/m) {           # if nothing but whitespace, delete
-                printVerbose("Add comment at move $moveNum:\n$propVal\n");
-                $diagram->property($moveNum, $shortPropID, text($propVal));
+            unless ($option{ignoreComments}) {
+                if ($propVal =~ m/\S/m) {           # if nothing but whitespace, delete
+                    printVerbose("Add comment at move $moveNum:\n$propVal\n");
+                    $diagram->property($moveNum, $shortPropID, text($propVal));
+                }
             }
         } elsif (($shortPropID eq 'DM') or      # DM[dbl]     Even position
                  ($shortPropID eq 'GB') or      # GB[dbl]     Good for black
@@ -667,8 +670,10 @@ sub SGF_ProcessProperty {
                 $currentLetter++;
             }
         } elsif ($shortPropID eq 'FG') {        # FG[pt:stext]] Figure - see spec
-            printVerbose("${shortPropID} $propVal, move=$moveNum\n");
-            $diagram->property($moveNum, 'C', $propVal);    # treat like a comment
+            unless ($option{ignoreComments}) {
+                printVerbose("${shortPropID} $propVal, move=$moveNum\n");
+                $diagram->property($moveNum, 'C', $propVal);    # treat like a comment
+            }
         } elsif ($shortPropID eq 'PM') {        # PM[num]       Print mode: 0=>no numbers, 1=>normal 2=>modulo 100 (see spec for details)
             # ignore
             printVerbose("${shortPropID} $propVal, move=$moveNum\n");
@@ -1128,6 +1133,10 @@ the diagrams. They should probably not be used together.
 The last move in each diagram is the first move in the next. This
 emulates a common style for annotating Go games.
 
+=item B<-ic> | B<-ignoreComments>
+
+Comments embedded in the SGF with the C property are ignored.
+
 =item B<-il> | B<-ignoreLetters>
 
 Letters embedded in the SGF with the L or LB property are ignored.
@@ -1371,6 +1380,8 @@ while (scalar(@ARGV)) {
         $option{varNumbersFlag} = 'correlative';
     } elsif (($arg eq '-im') or ($arg eq '-ignoreMarks')) {
         $option{ignoreMarks} = 1;
+    } elsif (($arg eq '-ic') or ($arg eq '-ignoreComments')) {
+        $option{ignoreComments} = 1;
     } elsif (($arg eq '-il') or ($arg eq '-ignoreLetters')) {
         $option{ignoreLetters} = 1;
     } elsif (($arg eq '-ip') or ($arg eq '-ignorePass')) {
@@ -1379,6 +1390,7 @@ while (scalar(@ARGV)) {
         $option{ignoreVariations} = 1;
     } elsif (($arg eq '-ia') or ($arg eq '-ignoreAll')) {
         $option{ignoreVariations} = 1;
+        $option{ignoreComments} = 1;
         $option{ignoreLetters} = 1;
         $option{ignoreMarks} = 1;
         $option{ignorePass} = 1;
@@ -1586,7 +1598,7 @@ exit(0);
 # The auto_bounds method is borrowed (stolen?) from Marcel Gruenauer's 
 #    Dg2SL converter for Sensei's Library (with slight modifications).
 #    We also use this for the VW (view) control property to make sure
-#    our coordinates don't extend past the VieW boundries.
+#    our coordinates don't extend past the VieW boundaries.
 #
 # set topLine, bottomLine, etc. based on the extent of the current diagram
 

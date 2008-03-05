@@ -1,4 +1,4 @@
-# $Id: Dg2TeX.pm 210 2007-07-05 02:00:09Z reid $
+# $Id: Dg2TeX.pm 213 2008-02-25 08:19:31Z reid $
 
 #   Dg2TeX
 #
@@ -58,7 +58,7 @@ our @EXPORT = qw(
 );
 
 BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 210 $' =~ /(\d+)/;
+    our $VERSION = sprintf "1.%03d", '$Revision: 213 $' =~ /(\d+)/;
 }
 
 ######################################################
@@ -367,10 +367,26 @@ Default: false
 
 =item B<texComments> =E<gt> true | false
 
-If this option is NOT used then the characters {, } and \ found in comments
-are replaced by [, ] and /, since TeX roman fonts do not have these
-characters. If this option is used, these substitutions are not made, so you
-can embed TeX source (like {\bf change fonts}) directly inside the comments.
+Certain characters, when found in comments, are normally remapped as
+follows:
+
+    \   =>  $\backslash$
+    {   =>  $\lbrace$
+    }   =>  $\rbrace$
+    $   =>  \$
+    &   =>  \&
+    #   =>  \#
+    ^   =>  $\wedge$
+    _   =>  \_
+    %   =>  \%
+    ~   =>  $\sim$
+    <   =>  $<$
+    >   =>  $>$
+    |   =>  $|$
+
+(see the TeX Book page 38).  When B<texComments> is specified, the mappings
+are supressed so you can embed normal TeX source (like {\bf change fonts})
+directly inside the comments.
 
 =item B<floatControl> =E<gt> controls which side diagrams will float on
 
@@ -700,14 +716,17 @@ Returns the converted text.
 sub convertText {
     my ($my, $text) = @_;
 
-    if ($my->{texComments}) {
-        $text =~ tr/<>_/[]-/            # \{} are untouched if texComments is true
-    } else {
-        $text =~ s/\\/\//gm;            #  \\ -> / since cmr10 has no backslash
-        $text =~ tr/{<>}_/[[]]-/;       #  cmr10 has no {<>}_ so substitute [[]]-
+    unless ($my->{texComments}) {
+        $text =~ s/\$/Q\$Q/gm;              # change dollar signs to Q$Q
+        $text =~ s/\\/\$\\backslash\$/gm;   # \   =>  $\backslash$
+        $text =~ s/Q\$Q/\\\$/gm;            #  escape $ ($ was changed to Q$Q above)
+        $text =~ s/([&#_%])/\\$1/gm;        #  escape &#_%
+        $text =~ s/{/\$\\lbrace\$/gm;       # {   =>  $\lbrace$
+        $text =~ s/}/\$\\rbrace\$/gm;       # }   =>  $\rbrace$
+        $text =~ s/\^/\$\\wedge\$/gm;       # ^   =>  $\wedge$
+        $text =~ s/\~/\$\\sim\$/gm;         # ~   =>  $\sim$
+        $text =~ s/([<>|])/\$$1\$/gm;       # <>| =>  $<$  $>$ $|$
     }
-    $text =~ s/([&~^\$%#])/\\$1/gm;     #  escape &~^$%#
-
     unless ($my->{simple}) {
         $text =~ s/\n/\\hfil\\break\n/gm;      # replace \n by \hfil\break
     }

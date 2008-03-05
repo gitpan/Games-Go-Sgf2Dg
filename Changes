@@ -1,6 +1,12 @@
 
     Change log
 
+from 4.211 to 4.215:
+    fixed t/Dg2Tk.t when X server is not available (for automated testing)
+    changed character mappings affected by -texComments to consistently map (or not)
+        all the special TeX characters.
+    some minor changes to Makefile.PL for auto-testing
+
 from 4.167 to 4.211:
     added -mag N option to set \magnification in Dg2TeX converter
     added \setGoFonts at <size> macro to tex/gooemacs.tex
@@ -21,7 +27,7 @@ from 4.167 to 4.211:
     added -cs | -coord-style for different coordinate styles
     coordinates are managed centrally by Diagram.pm
     changed magnification default to 1000 so diagrams with coordinates can
-        now fit in -twoColumn mode.  Removed restrictrion preventing using
+        now fit in -twoColumn mode.  Removed restriction preventing using
         twoColum and coords together.
     finishDiagram now takes an text argument which is printed if a diagram is finished
         and verbose mode is on (for an explanation of why new diagrams must be created)
@@ -30,16 +36,16 @@ from 4.167 to 4.211:
     significant re-structuring of property handling to better handle FF4 SGF files:
         Game properties (players, place, date, etc) are explicitly stored in
             node 0, and are now centrally managed in Diagram.pm for better
-            consistancy across different converters.
+            consistency across different converters.
         W/B[tt] still works on 19x19 boards, but other sizes must use W/B[] for a pass
         MN[number] to force move number is supported
         Composed points ([bc:de]) are supported for appropriate properties
     special characters and linebreaks in comments are treated as per the FF4 rules
     All four MArk styles are supported (triangle, circle, square, and X)
-    Labelling now works on empty intersections, and for multi-character labels
+    Labeling now works on empty intersections, and for multi-character labels
         some converters are clever enough to switch to a smaller font for labels and
         numbers that are too big (typically between 2 and 3 characters), but only once,
-        very big labels will go beyond the boundries of the intersection
+        very big labels will go beyond the boundaries of the intersection
     VW[bc:de] is supported
 
     Not supported:

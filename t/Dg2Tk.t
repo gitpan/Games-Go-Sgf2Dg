@@ -45,25 +45,29 @@ my $dg2tk;
 ##
 ## create dg2tk object:
 ##
-eval { $dg2tk = Games::Go::Dg2Tk->new(
-        doubleDigits => 0,
-        coords       => 1, ); };
-is( $@, '',                                     'new Dg2Tk object'  );
-isa_ok( $dg2tk, 'Games::Go::Dg2Tk',             '   dg2tk is the right class'  );
+SKIP: {
+    eval { $dg2tk = Games::Go::Dg2Tk->new(
+            doubleDigits => 0,
+            coords       => 1, ); };
+    skip ("$@ (no X server?)", 4) if ($@ =~ m/couldn't connect to display/);
 
-$dg2tk->configure(boardSizeX => 5, 
-                  boardSizeY => 5,
-                  bg        => '#d2b48c');
-$dg2tk->convertDiagram($diagram);
-$dg2tk->{mw}->update;
-$dg2tk->{mw}->after(500);
-eval {$dg2tk->comment(' comment')};
-is( $@, '',                                     'added comment' );
-$dg2tk->comment(' and more comment');
-is( $@, '',                                     'raw print' );
-$dg2tk->{mw}->update;
-$dg2tk->{mw}->after(500);
-$dg2tk->{mw}->destroy;
+    is( $@, '',                                     'new Dg2Tk object'  );
+    isa_ok( $dg2tk, 'Games::Go::Dg2Tk',             '   dg2tk is the right class'  );
+
+    $dg2tk->configure(boardSizeX => 5, 
+                      boardSizeY => 5,
+                      bg        => '#d2b48c');
+    $dg2tk->convertDiagram($diagram);
+    $dg2tk->{mw}->update;
+    $dg2tk->{mw}->after(500);
+    eval {$dg2tk->comment(' comment')};
+    is( $@, '',                                     'added comment' );
+    $dg2tk->comment(' and more comment');
+    is( $@, '',                                     'raw print' );
+    $dg2tk->{mw}->update;
+    $dg2tk->{mw}->after(500);
+    $dg2tk->{mw}->destroy;
+}
 
 ##
 ## end of tests

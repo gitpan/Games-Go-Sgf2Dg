@@ -90,7 +90,7 @@ raw print
 ',                                              'converted TeX is good' );
 is( $dg2tex->converted(''), '',                 'converted TeX cleared' );
 is( $dg2tex->convertText('this <is> a {TeX} \conversion_test'), 
-                         "this [is] a [TeX] /conversion-test",
+                         'this $<$is$>$ a $\lbrace$TeX$\rbrace$ $\backslash$conversion\_test',
                                                 'text-to-TeX conversion');
 
 my $diagram;

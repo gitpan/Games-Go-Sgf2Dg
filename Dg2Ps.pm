@@ -1,4 +1,4 @@
-# $Id: Dg2Ps.pm 171 2007-04-14 04:31:46Z reid $
+# $Id: Dg2Ps.pm 213 2008-02-25 08:19:31Z reid $
 
 #   Dg2Ps
 #
@@ -65,7 +65,7 @@ our @EXPORT = qw(
 );
 
 BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 171 $' =~ /(\d+)/;
+    our $VERSION = sprintf "1.%03d", '$Revision: 213 $' =~ /(\d+)/;
 }
 
 ######################################################
@@ -644,7 +644,7 @@ sub convertText {
     # $text =~ s/([^\n])\n([^\n])/$1 $2/gs;
     $text =~ s/\r/\\r/gs;
     $text =~ s/\t/\\t/gs;
-    # $text =~ s/\b/\\b/gs;     # hmmm, \b is word boundry in perl
+    # $text =~ s/\b/\\b/gs;     # hmmm, \b is word boundary in perl
     $text =~ s/\f/\\f/gs;
 
     return $text;
@@ -1235,7 +1235,7 @@ sub _createPostScript {
 
 
 % draw the board, given a global b_sizeX/Y and the
-%    left, right, top, and bottom boundry lines
+%    left, right, top, and bottom boundary lines
 /_board { % ( b_left, b_top, b_right, b_bottom)
     /b_bottom exch def
     /b_right exch def

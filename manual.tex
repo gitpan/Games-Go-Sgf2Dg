@@ -45,21 +45,17 @@ Kolodziejska's and van der Steen's.
 
 {\tt sgf2dg} may be obtained from 
 {\tt http://match.stanford.edu/bump/go.html}\hfil\break 
-or {\tt ftp://match.stanford.edu/pub/sgf2dg-<version>.tar.gz}.
+or {\tt ftp://match.stanford.edu/pub/sgf2dg-<version>.tar.gz}.  It is also
+available from the Comprehensive Perl Archive Network (CPAN): go to {\tt
+http://search.cpan.org/} and search for {\tt sgf2dg}.
 
 \TeX\ is a trademark of the American Mathematical Society. \metafont\ is
 a trademark of Addison Wesley Publishing Company.
 
-\bigbreak
+\smallbreak
 \line{\hglue2in Daniel Bump ({\tt bump@math.stanford.edu})\hfil}
 \line{\hglue2in  Reid Augustin ({\tt reid@hellosix.com}), 1997, 1998\hfil}
-
-\bigbreak\noindent
-{\bf Postscript}: {\tt sgf2dg} is the successor program to
-{\tt sgf2tex}. The Perl script has been rewritten from scratch by
-Reid.  Plugin output converters produce several formats besides \TeX. The
-\TeX\ fonts have been supplemented with a few more symbols to support SGF
-FF4.
+\smallbreak\noindent
 
 \vfil
 \hbox to\hsize{
@@ -595,6 +591,7 @@ sgf2dg [options] [file.sgf]
 \ -av | -absoluteVarNums     move numbers in variation == main line numbers
 \ -cv | -correlativeVarNums  start main variations from 1 
 \ -rl | -repeatLast          repeat last move as first in next diagram
+\ -ic | -ignoreComments      ignore SGF comments
 \ -il | -ignoreLetters       ignore SGF letters
 \ -im | -ignoreMarks         ignore SGF marks
 \ -iv | -ignoreVariations    ignore SGF variations
@@ -697,6 +694,8 @@ the {\tt -cv} or {\tt -correlativeVarNums} option.
 {\tt -repeatlast} causes the last move in each diagram to duplicate the
 first move in the next. This emulates a common style of Go writing.
 
+{\tt -ic} or {\tt ignoreComments} causes SGF comments to be ignored.
+
 {\tt -il} or {\tt ignoreLetters} causes SGF letters to be ignored.
 
 {\tt -im} or {\tt ignoreMarks} causes SGF marks to be ignored.
@@ -733,7 +732,8 @@ The remaining options apply only to the {\tt Dg2TeX} converter.
 the comments below it. This option is useful if you intend to edit
 the \TeX\ and don't want a fancy format forced on you.
 
-{\tt -mag number (Dg2TeX)} changes the default {\tt \\magnification} from 1000 to number.
+{\tt -mag number (Dg2TeX)} changes the default {\tt \\magnification} from
+1000 to {\tt number}.
 
 {\tt -twoColumn (Dg2TeX)} implements a two-column format, making use of the alternative
 macros in {\tt gotcmacs.tex}. Two-column formats are used in some Go books and
@@ -744,26 +744,41 @@ boards may fit side-by-side on the page. The text font is not reduced.
 {\tt -bigFonts (Dg2TeX)} uses {\tt \\bgoo} and {\tt \\bgoe}, using fonts which
 are 1.2 times larger.
 
-In order to explain {\tt -texComments}, we need to explain how
-{\tt sgf2dg} treats comments. The characters {\tt \\},
-{\tt [} and {\tt ]} are represented in a valid SGF file by their
-``escaped'' versions {\tt \\\\}, {\tt \\[} and {\tt \\]}. First,
-these escapes (i.e.\ the {\tt \\}'s preceding the characters) are discarded.
+\vfil\eject  % prevent a bad page break here
+{\tt -texComments (Dg2TeX)}: Certain characters, when found in comments, are normally
+remapped as follows:
 
-Now, there are two different modes of processing the comment string.
-In the first mode, the characters {\tt \\, \char'173, \char'175, \char'074, 
-\char'076} and {\tt \char'137} are replaced by {\tt /, [, ], [, ]} and {\tt -}, 
-respectively. This is done because {\it these characters do not exist in \TeX\ 
-roman}, so it is impossible to print them without changing fonts. Instead,
-{\tt sgf2dg} makes plausible substitutions. 
+\medbreak
+\centerline{
+\vbox{
+\baselineskip=15pt
+\halign{\hfil\quad#\quad\hfil&\hfil\quad#\quad\hfil&\quad#\hfil\cr
+    $\backslash$ &$\rightarrow$  &\$$\backslash$backslash\$  \cr
+    $\lbrace$    &$\rightarrow$  &\$$\backslash$lbrace\$  \cr
+    $\rbrace$    &$\rightarrow$  &\$$\backslash$rbrace\$  \cr
+    \$           &$\rightarrow$  &$\backslash$\$  \cr
+    \&           &$\rightarrow$  &$\backslash$\&  \cr
+    \#           &$\rightarrow$  &$\backslash$\#  \cr
+    $\wedge$     &$\rightarrow$  &\$$\backslash$wedge\$  \cr
+    \_           &$\rightarrow$  &$\backslash$\_  \cr
+    \%           &$\rightarrow$  &$\backslash$\%  \cr
+    $\sim$       &$\rightarrow$  &\$$\backslash$sim\$  \cr
+    $<$          &$\rightarrow$  &\$$<$\$  \cr
+    $>$          &$\rightarrow$  &\$$>$\$  \cr
+    $|$          &$\rightarrow$  &\$$|$\$  \cr
+}}}
+\medbreak
 
-If the {\tt -texComments (Dg2TeX)} option is used, then {\tt \\, \char'173} and {\tt
-\char'175} are not modified. This way, the user can select {\tt
-\char'173\\bf {\bf boldface}\char'175}, switch fonts, or place other \TeX\
-control sequences in the comments.
+This is done because either {\it these characters do not exist in \TeX\
+roman font}, so it is impossible to print them without changing fonts, or
+because the characters have special meaning to \TeX\ (see {\it The \TeX\
+Book} page 38). Instead of using the characters directly, {\tt Dg2TeX}
+makes plausible substitutions.  When {\tt texComments} is specified, the
+mappings are supressed so you can embed normal \TeX\ source (like {\tt
+\char'173\\bf boldface\char'175}) directly inside the comments.
 
 {\tt -floatControl (Dg2TeX)} is followed by a control string.  In normal
-mode (not {\tt simple} and not {\tt twoColumn}, {\tt Dg2TeX} floats the
+mode (not {\tt simple} and not {\tt twoColumn}), {\tt Dg2TeX} floats the
 board diagram to the left or right of the text and if the text is extensive
 enough, it flows around the diagram.  The control string is a sequence of
 letters that control placement of the diagram float.
@@ -781,7 +796,7 @@ letters that control placement of the diagram float.
 The first letter is for the first diagram, second letter is for the second
 diagram, and so on. When there is only one letter left, that letter
 controls all remaining diagrams.  The default control string is '{\tt rx}'
-which places the first diagram on the right, all others are placed
+which places the first diagram on the right, and the rest are placed
 randomly.
 
 \vfil\eject
@@ -820,11 +835,11 @@ the ASCII converter instead of the default \TeX\ converter, use:
 \vglue.12in
 Converter names are case sensitive.
 
-The default output filename suffix is determined by the converter:
-the converter name is lower-cased to become the suffix, so the ASCII
-converter produces {\tt <filename>.ascii} from {\tt <filename>.sgf}.
+The default output filename suffix is determined by the converter name: the
+name is lower-cased to become the suffix, so the ASCII converter produces
+{\tt <filename>.ascii} from {\tt <filename>.sgf}.
 
-You can also select different converters by changing the name of
+You can select different default converters by changing the name of
 the {\tt sgf2dg} script (or better, make symbolic links, or copies if
 your system can't handle links).  The converter name is extracted
 from the name with this regular expression:
@@ -905,16 +920,16 @@ the {\tt Tk::Canvas} widgets.  This explains why the background
 color example above works.
 
 \vfil\eject
-\centerline{\titlefont Variations}
+\centerline{\titlefont Handling Variations using {\titlett sgfsplit}}
 \vglue.18in
 If your SGF file contains variations, {\tt sgf2dg} will print them
 and generate labels for them according to a logical scheme.
 
-We offer also an alternative. The {\tt C} program {\tt sgfsplit} will 
+We also offer an alternative. The {\tt C} program {\tt sgfsplit} will 
 create from the file a sequence of other SGF files each containing
 one variation. The normal usage is {\tt sgfsplit} [{\it filename}]. This will
 create from the file [{\it filename}] or [{\it filename}]{\tt .sgf} a sequence of
-files called [{\it filename}]{\tt .0.sgf}, [{\it filename}]{\tt .0.sgf}, etc. The first
+files called [{\it filename}]{\tt .0.sgf}, [{\it filename}]{\tt .1.sgf}, etc. The first
 file contains the main line, the remaining files, variations. Also
 created is an executable shell script called [{\it filename}]{\tt .sgf2dg}
 which contains suggested commands for invoking {\tt sgf2dg}. In particular,
@@ -980,7 +995,7 @@ But if this is your intention, {\tt sgf2dg -simple} will produce a file
 as uncluttered as possible.)
 
 The ultimate source for \TeX nical enlightenment is of course
-{\it The \TeX book} by Donald Knuth (Addison-Wesley, 1984). We will try
+{\it The \TeX\ Book} by Donald Knuth (Addison-Wesley, 1984). We will try
 to explain a few things which may be helpful to the user.
 
 The file {\tt gooemacs.tex} contains macros needed to typeset Go games. You
