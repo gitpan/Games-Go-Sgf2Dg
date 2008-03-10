@@ -107,8 +107,11 @@ sub editTexMakefile {
     die "Can't 'do ./findTEXMF: $!$@\n" unless(defined(do './findTEXMF'));
     my $v;
     eval { $v = getVariables(); };      # try to find TEXMF variables
-    die ("\nUser Abort - TeX fonts and macros will not be installed during 'make install'.\n",
-         "             However, you can still 'make install' for the rest of Sgf2Dg\n\n") if ($@);
+    if ($@) {
+        print ("\nUser Abort - TeX fonts and macros will not be installed during 'make install'.\n",
+               "             However, you can still 'make install' for the rest of Sgf2Dg\n\n");
+        exit(0);    # not an error
+    }
     my $texmfRoot ='/usr/share/texmf';
     my $mfdir = "$texmfRoot/fonts/source/public/GOOE";
     my $tfmdir = "$texmfRoot/fonts/tfm/public/GOOE";

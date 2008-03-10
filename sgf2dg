@@ -53,12 +53,12 @@ use IO::File;
 use Games::Go::Diagram; # the go diagram module
 
 BEGIN {
-    our $VERSION = sprintf "4.%03d", '$Revision: 215 $' =~ /(\d+)/;
+    our $VERSION = sprintf "4.%03d", '$Revision: 216 $' =~ /(\d+)/;
 }
 
 use constant a_MINUS_1 => ord('a') - 1; # base of SGF coordinates is 'a'
 
-my $version = sprintf "version 4.%03d", '$Revision: 215 $' =~ /(\d+)/;
+my $version = sprintf "version 4.%03d", '$Revision: 216 $' =~ /(\d+)/;
 
 my $myName = $0;             # full pathname of this file
 $myName =~ s".*/"";          # delete any preceding path

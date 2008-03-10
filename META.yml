@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Games-Go-Sgf2Dg
-version:             4.215
+version:             4.216
 abstract:            sgf2dg (replaces sgf2tex) converts Smart Go Format (SGF) files to Go diagrams - includes the GOOE TeX fonts
 license:             ~
 author:              
