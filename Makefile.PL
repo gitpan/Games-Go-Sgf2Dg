@@ -7,8 +7,7 @@ use Config;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 
-our $osname = lc($Config{osname});
-our $dos = (($osname eq 'dos') or ($osname eq 'win32'));
+my $dos = (($Config{osname} eq 'dos') or ($Config{osname} eq 'win32'));
 
 my $ver = `svnversion .`;
 # if good, $ver might be one of: qw( 4168 4123:4167 4166M 4165S 4212:4164MS )
@@ -64,12 +63,12 @@ WriteMakefile(
     NAME                => 'Games::Go::Sgf2Dg', # package name
     VERSION_FROM        => 'sgf2dg',            # finds $VERSION
     EXE_FILES           => ['sgf2dg',  $dos ? 'sgfsplit.exe' : 'sgfsplit'],
+    OBJECT              => 'sgfsplit.o',        # only one .o for this non-perl program
     MAN1PODS            => {sgf2dg      => "\$(INST_MAN1DIR)/sgf2dg.1",
                             'sgfsplit.c' => "\$(INST_MAN1DIR)/sgfsplit.1",},
     ABSTRACT            => "sgf2dg (replaces sgf2tex) converts Smart Go Format (SGF) files to Go diagrams - includes the GOOE TeX fonts",
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
       (AUTHOR     => 'Dan Bump <bump@match.stanford.edu>, Reid Augustin <reid@hellosix.com>') : ()),
-    dist => { COMPRESS=>"gzip", SUFFIX=>"gz" },
 );
 
 $| = 1;             # autoflush STDOUT from now on
@@ -95,16 +94,11 @@ fonts :
 TEX_TARGET
 }
 
-# no dynamic targets for this package:
-sub MY::dynamic {
-    return '';
-}
-
 sub editTexMakefile {
     # installing TeX stuff is a bit tricky - we don't know where it
     #   might be on this system.  try kpsewhich:
 
-    die "Can't 'do ./findTEXMF: $!$@\n" unless(defined(do './findTEXMF'));
+    die "Can't 'do ./findTEXMF': $!$@\n" unless(defined(do './findTEXMF'));
     my $v;
     eval { $v = getVariables(); };      # try to find TEXMF variables
     if ($@) {

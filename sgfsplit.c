@@ -77,13 +77,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111, USA.
 #define MAXSIZE 16384
 #define PERMISSIONS 0700
 
-int parse(char str[],char sgfout[],char name[],int filecount,int movebreak);
+void parse(char str[],char sgfout[],char name[],int filecount,int movebreak);
  
 char sgf[MAXSIZE],sgfout[MAXSIZE];
 char name[128],oname[128],bname[128],extra_args[128];
 FILE *bp;
 
-main(int argc,char *argv[])
+int main(int argc,char *argv[])
 {
   FILE *fp;
   int c,i;
@@ -116,19 +116,19 @@ suggested sgf2dg commands.\n\n");
   name=argv[1];
   extra_args[0]='\0';
   for (i=2; i<argc; i++) {
-    strcat(extra_args,argv[i]);
+    strcat(extra_args,name);
     strcat(extra_args," ");
   }
   if (((fp=fopen(name,"r"))==NULL) &&
       ((fp=fopen(strcat(name,".sgf"),"r"))==NULL)) {
-    fprintf(stderr,"sgfsplit: can't open file %s\n",argv[1]);
+    fprintf(stderr,"sgfsplit: can't open file %s\n",name);
     return(1);
   }
   if (!strcmp(name+strlen(name)-4,".sgf")) name[strlen(name)-4]='\0';
   i=0;
   while ((c=getc(fp))!=EOF) sgf[i++]=c;
   if (i>=MAXSIZE) {
-    fprintf(stderr,"%d: file too long\n",argv[0]);
+    fprintf(stderr,"%s: file too long\n",name);
     return(1);
   }
   sprintf(bname,"%s.sgf2dg",name);
@@ -144,11 +144,12 @@ suggested sgf2dg commands.\n\n");
   fclose(bp);
   printf("Writing %s.\n\n",bname);
   chmod(bname,PERMISSIONS);
+  return(0);
 }
 
 /* cuts a piece from a string */
 
-cutstr(char str[],int left,int right)
+void cutstr(char str[],int left,int right)
 {
   int i=left;
   while ((str[i]=str[i-left+right+1])!='\0') i++;
@@ -177,9 +178,9 @@ cutstr(char str[],int left,int right)
    a file and the program terminates. */
 
 
-parse(char str[],char sgfout[],char name[],int filecount,int movebreak)
+void parse(char str[],char sgfout[],char name[],int filecount,int movebreak)
 {
-  int i=0,j=0,lparen,rparen,pstate=0,mstate=0;
+  int i=0,j=0,lparen=0,rparen=0,pstate=0,mstate=0;
   int bracecount=0,movenum=0,nextbreak=0,escape=0;
   char oname[128];
   FILE *fp;
@@ -189,15 +190,15 @@ parse(char str[],char sgfout[],char name[],int filecount,int movebreak)
     if (str[i]=='\\') {escape=1;
     } else escape=0;
     if (bracecount<0) {
-      fprintf(stderr,"sgfsplit: unmatched ] in %d\n",name);
-      return(1);
+      fprintf(stderr,"sgfsplit: unmatched ] in %s\n",name);
+      return;
     }
     switch (pstate) {
     case 0:
       switch (str[i]) {
       case '(': if (bracecount==0) {pstate=1; break;}
-      case ')': fprintf(stderr,"sgfsplit: unmatched ) in %d",name); 
-        return(1);
+      case ')': fprintf(stderr,"sgfsplit: unmatched ) in %s",name); 
+        return;
       default: sgfout[j++]=str[i];
       } break;
     case 1:
@@ -241,7 +242,7 @@ parse(char str[],char sgfout[],char name[],int filecount,int movebreak)
     sprintf(oname,"%s.%d.sgf",name,filecount++);
     if((fp=fopen(oname,"w"))==NULL) {
       fprintf(stderr,"sgfsplit: can't open output file\n");
-      return(1);
+      return;
     }
     if (movebreak!=0) {
       fprintf(bp,"sgf2dg -n -im -il -firstDiagram 2 -break %d %s%s\n",movebreak,extra_args,oname);
@@ -260,7 +261,7 @@ parse(char str[],char sgfout[],char name[],int filecount,int movebreak)
       sprintf(oname,"%s.%d.sgf",name,filecount++);
       if((fp=fopen(oname,"w"))==NULL) {
         fprintf(stderr,"sgfsplit: can't open output file\n");
-        return(1);
+        return;
       }
       if (movebreak!=0) {
         fprintf(bp,"sgf2dg -n -im -il -firstDiagram 2 -break %d %s%s\n",movebreak,extra_args,oname);
@@ -269,6 +270,7 @@ parse(char str[],char sgfout[],char name[],int filecount,int movebreak)
       fclose(fp);
       printf("Writing %s. Break is at %d.\n",oname,movebreak);
    }
+  return;
 }
 
 
