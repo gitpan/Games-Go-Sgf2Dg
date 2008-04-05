@@ -1,7 +1,7 @@
 
     Change log
 
-from 4.211 to 4.220:
+from 4.211 to 4.221:
     fixed t/Dg2Tk.t when X server is not available (for automated testing)
     changed character mappings affected by -texComments to consistently map (or not)
         all the special TeX characters.

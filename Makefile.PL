@@ -1,11 +1,15 @@
 
 use 5.005;
 use strict;
+use POSIX;
+use File::Find;
 use ExtUtils::MakeMaker;
 use IO::File;
 use Config;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
+
+my ($texmfRoot, $mfdir, $tfmdir, $texInputs, $kpsewhich, %pkFontHash, %find);
 
 my $dos = (($Config{osname} eq 'dos') or ($Config{osname} eq 'win32'));
 
@@ -59,10 +63,19 @@ if ($@) {
 
 }
 
+my @exe_files = ('sgf2dg');
+if ($dos) {     # punt
+    print "\nI'm sorry, but since this is a DOS platform, if you need sgfsplit, you'll\n",
+          "  need to compile it yourself.  If you've got all the right tools, you may\n",
+          "  be able to type 'make sgfsplit.exe'.\n\n";
+} else {
+    push(@exe_files, 'sgfsplit');
+}
+
 WriteMakefile(
     NAME                => 'Games::Go::Sgf2Dg', # package name
     VERSION_FROM        => 'sgf2dg',            # finds $VERSION
-    EXE_FILES           => ['sgf2dg',  $dos ? 'sgfsplit.exe' : 'sgfsplit'],
+    EXE_FILES           => \@exe_files,
     OBJECT              => 'sgfsplit.o',        # only one .o for this non-perl program
     MAN1PODS            => {sgf2dg      => "\$(INST_MAN1DIR)/sgf2dg.1",
                             'sgfsplit.c' => "\$(INST_MAN1DIR)/sgfsplit.1",},
@@ -98,7 +111,6 @@ sub editTexMakefile {
     # installing TeX stuff is a bit tricky - we don't know where it
     #   might be on this system.  try kpsewhich:
 
-    die "Can't 'do ./findTEXMF': $!$@\n" unless(defined(do './findTEXMF'));
     my $v;
     eval { $v = getVariables(); };      # try to find TEXMF variables
     if ($@) {
@@ -235,4 +247,236 @@ sub editMakefile {
     unlink 'Makefile.tmp';
 }
 
+sub getVariables {
+
+    get_TEXMF();        # try to find the TEXMF root directory
+    myFind($texmfRoot); # build database of directory names below TEXMF root
+    myFind('/var');     # add directories in /var
+    get_PKFONTS();
+    get_TEXINPUTS();
+    getMFDIR();
+    get_TFMDIR();
+    return { TEXMF => $texmfRoot,
+             MFDIR => $mfdir,
+             TFMDIR => $tfmdir,
+             TEXINPUTS => $texInputs,
+             PKFONTS => [keys(%pkFontHash)],
+            };
+}
+
+sub get_TEXMF {
+
+    print "try kpsewhich... ";
+    `kpsewhich -expand-var \\\$TEXMF 2>/dev/null`; # try it
+    $kpsewhich = WIFEXITED($?);     # normal exit?
+    # $kpsewhich = 0;                 # prevent kpsewhich
+
+    # try to find TEXMF root directory candidates
+    my %tmfRootHash;
+    kpsewhich_get(\%tmfRootHash, qw(TEXMF TEXMFLOCAL TEXMFMAIN VARTEXMF HOMETEXMF));
+    locateRoot(\%tmfRootHash);      # try 'locate'
+    foreach (keys(%tmfRootHash)) {
+        delete($tmfRootHash{$_}) if (m#^/var/#);    # /var should contain only variable stuff
+    }
+
+    print "\n";
+    unless(scalar(keys(%tmfRootHash))) {
+        print "\nHmmm, I can't find your root TEXMF directory.  I'll have to ask for\n",
+              " your help.  You may find the INSTALL file has some useful hints.\n\n";
+        $tmfRootHash{enter_directory()} = 1;
+    }
+
+    if (scalar(keys(%tmfRootHash)) > 1) {
+        print "Looks like the TEXMF root (install) directory is one of these:\n\n";
+        $texmfRoot = selectDir(keys(%tmfRootHash));
+    } else {
+        foreach (keys(%tmfRootHash)) {
+            $texmfRoot = $_;        # there's only one
+        }
+    }
+}
+
+
+sub get_PKFONTS {
+    # collect possible PKFONTS directories
+    kpsewhich_get(\%pkFontHash, 'PKFONTS');       # get kpsewhich's idea of PKFONTS
+    foreach(grep m#$texmfRoot/.*\bGOOE$#, keys(%find)) {    # and do our own search as well
+        $pkFontHash{$_} = 1;
+    }
+    foreach(grep m#/texmf/.*\bpk/.*\bGOOE$#, keys(%find)) {  # and outside the root
+        $pkFontHash{$_} = 1;
+    }
+    # remove PKFONTS directories that don't contain go*pk files
+    foreach (keys(%pkFontHash)) {
+        my @globs = glob("$_/go*pk");
+        delete ($pkFontHash{$_}) unless (@globs > 0);
+    }
+}
+
+sub get_TEXINPUTS {
+
+    # collect possible TEXINPUTS directories
+    my %texInputHash;
+    kpsewhich_get(\%texInputHash, 'TEXINPUTS');   # get kpsewhich's idea of TEXINPUTS
+    foreach(grep m#$texmfRoot/tex$#, keys(%find)) {        # and do our own search as well
+        $texInputHash{$_} = 1;
+    }
+    foreach(grep m#/tex/.*\bGOOE$#, keys(%find)) {        # and do our own search as well
+        $texInputHash{$_} = 1;
+    }
+    # if there's already a GOOE TEXINPUT directory, remove all others
+    my @texInputsArray;
+    foreach (keys(%texInputHash)) {
+        push(@texInputsArray, $_) if (m#/GOOE\b#);
+    }
+
+    # if there are no GOOEs already (first-time install), copy our collection
+    @texInputsArray = keys(%texInputHash) unless (@texInputsArray);
+
+    # if no TEXINPUT directories yet, we have to ask for input
+    unless(@texInputsArray) {
+        print "\nYour root TEXMF directory is $texmfRoot, but I can't find a TEXINPUTS\n",
+              "  subdirectory under it.  Please see the INSTALL file for more information.\n",
+              "\nPlease enter a directory for TEXINPUTS (it must already exist):\n\n";
+        push(@texInputsArray, enter_directory());
+    }
+
+    # if multiple TEXINPUTS, ask user to select one
+    if (@texInputsArray > 1) {
+        print "Looks like the TEXINPUTS directory is one of these:\n\n";
+        $texInputs = selectDir(@texInputsArray);
+    } else {
+        $texInputs = $texInputsArray[0];
+    }
+}
+
+sub getMFDIR {
+
+    # MFDIR is the path to the Metafont sources
+    foreach ('fonts/source/public', 'fonts/source', '/metafont/misc') {
+        if (-d "$texmfRoot/$_") {
+            $mfdir = "$texmfRoot/$_";
+            last;
+        }
+    }
+    # if no mfdir directory yet, we have to ask for input
+    unless(defined($mfdir)) {
+        print "\nYour root TEXMF directory is $texmfRoot, but I can't find the right\n",
+              "  place to put the font source (*.mf) files.\n",
+              "\nPlease enter a directory for MFDIR, probably somewhere under $texmfRoot\n",
+              "   (it must already exist, but I will add /GOOE to the end of what you enter):\n\n";
+        $mfdir = enter_directory();
+    }
+    $mfdir =~ s#/GOOE$##;
+    $mfdir .= '/GOOE';
+}
+
+sub get_TFMDIR {
+
+    # TFMDIR is the path to the .tfm files.
+    foreach ('fonts/tfm/public', 'fonts/tfm') {
+        if (-d "$texmfRoot/$_") {
+            $tfmdir = "$texmfRoot/$_";
+            last;
+        }
+    }
+    # if no mfdir directory yet, we have to ask for input
+    unless(defined($tfmdir)) {
+        print "\nYour root TEXMF directory is $texmfRoot, but I can't find the right\n",
+              "  place to put the font metric (*.tfm) files.\n",
+              "\nPlease enter a directory for TMFDIR, probably somewhere under $texmfRoot\n",
+              "   (it must already exist, but I will add /GOOE to the end of what you enter):\n\n";
+        $tfmdir = enter_directory();
+    }
+    $tfmdir =~ s#/GOOE$##;
+    $tfmdir .= '/GOOE';
+}
+
+sub wanted {
+    -d $_ &&    # could use magic _ here, but time diff is minimal and $_ is robust
+    ($find{$_} = 1);
+}
+
+sub myFind {
+    my ($root) = @_;
+
+    no warnings;
+    File::Find::find({wanted => \&wanted,
+                      follow_fast => 1,
+                      follow_skip => 2,
+                      no_chdir => 1},
+                      $root);
+}
+
+sub locateRoot {
+    my $hash = shift;
+
+    print "try locate...";
+    my @locate = `locate texmf`;
+    unless (WIFEXITED($?)) {
+        # print "\$?=$?\n";
+        return 0;
+    }
+    grep( { m#(.*/texmf)/# && ($hash->{$1} = 1); } @locate);  # save everything with '/texmf/'
+    return 1;
+}
+
+
+sub kpsewhich_get {
+    my $hash = shift;
+
+    return unless($kpsewhich);
+    foreach my $dir (@_) {
+        my $str = `kpsewhich -expand-var \\\$$dir 2>/dev/null`;
+        chomp $str;
+        $str = `kpsewhich --expand-braces "$str"`;
+        chomp $str;
+        $str =~ s#//*#/#g;
+        my @a = split(':', $str);
+        foreach my $name (grep( {-d $_} grep( {not $_ eq '.'} @a))) {
+            $name =~ s#/*$##;   # remove any trailing slashes
+            $hash->{$name} = 1;
+        }
+    }
+}
+
+sub selectDir {
+    my @dirs = @_;
+
+    my ($ii, $rsp);
+    do {
+        for($ii = 1; $ii <= @dirs; $ii++) {
+            print "    $ii. $dirs[$ii - 1]\n";
+        }
+        print "    $ii. Select a different directory\n";
+        print "    q. Quit\n";
+        $rsp = prompt("\nPlease select one: ", 'q');
+        chomp $rsp;
+        die ("Quitting...\n") if ((lc($rsp) eq 'q') or
+                                  (lc($rsp) eq ''));
+    } while(not defined($rsp) or
+            ($rsp == 0) or
+            ($rsp =~ m/\D/) or
+            ($rsp > $ii));
+    if ($rsp == $ii) {
+        return(enter_directory());
+    }
+    return $dirs[$rsp - 1];
+}
+
+sub enter_directory {
+
+    my $rsp;
+    do {
+        $rsp = prompt("\nPlease enter directory name (or 'q' to quit): ", 'q');
+        chomp $rsp;
+        die ("Quitting...\n") if ((lc($rsp) eq 'q') or
+                                  (lc($rsp) eq ''));
+        unless (-d $rsp) {
+            print "\n$rsp is not a directory"
+        }
+    } while(not defined($rsp) or
+            (not -d $rsp));
+    return $rsp;
+}
 
