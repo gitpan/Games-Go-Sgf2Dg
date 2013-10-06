@@ -1,30 +1,22 @@
-# $Id: Dg2TkPs.pm 143 2005-06-03 21:05:57Z reid $
-
-#   Dg2TkPs
+#===============================================================================
+#
+#         FILE:  Dg2TkPs
+#
+#     ABSTRACT:  convert Games::Go::Sgf2Dg::Diagrams to Postscript from a Tk window
+#
+#       AUTHOR:  Reid Augustin (REID), <reid@hellosix.com>
+#===============================================================================
 #
 #   Copyright (C) 2005 Reid Augustin reid@hellosix.com
 #                      1000 San Mateo Dr.
 #                      Menlo Park, CA 94025 USA
 #
-#   This library is free software; you can redistribute it and/or modify it
-#   under the same terms as Perl itself, either Perl version 5.8.5 or, at your
-#   option, any later version of Perl 5 you may have available.
-#
-#   This program is distributed in the hope that it will be useful, but
-#   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-#   or FITNESS FOR A PARTICULAR PURPOSE.
-#
-
-=head1 NAME
-
-Games::Go::Dg2TkPs - Perl extension to convert Games::Go::Diagrams to
-Postscript.
 
 =head1 SYNOPSIS
 
-use Games::Go::Dg2TkPs
+use Games::Go::Sgf2Dg::Dg2TkPs
 
- my $dg2ps = B<Games::Go::Dg2TkPs-E<gt>new> (options);
+ my $dg2ps = B<Games::Go::Sgf2Dg::Dg2TkPs-E<gt>new> (options);
  my $canvas = $dg2ps->convertDiagram($diagram);
 
 =head1 DESCRIPTION
@@ -34,9 +26,9 @@ converter.  All it does is use the built-in PostScript that a
 Tk::Canvas widget provides to convert the Dg2Tk canvas pages to
 PostScript.  The resulting PostScript is fairly crude because the
 Canvas that it is drawn from is crude to begin with.  See
-L<Games::Go::Dg2Ps> for a better PostScript converter.
+L<Games::Go::Sgf2Dg::Dg2Ps> for a better PostScript converter.
 
-A Games::Go::Dg2TkPs inherits from L<Games::Go::Dg2Tk>, and uses all
+A Games::Go::Sgf2Dg::Dg2TkPs inherits from L<Games::Go::Sgf2Dg::Dg2Tk>, and uses all
 its methods and options.  The main difference is that after
 conversion to Tk is complete, each diagram L<Tk::Canvas> is
 converted to PostScript via the L<Tk::Canvas>->postscript method.
@@ -48,11 +40,13 @@ canvas pages together.
 use strict;
 require 5.001;
 
-package Games::Go::Dg2TkPs;
-use Games::Go::Dg2Tk;
+our $VERSION = '4.249'; # VERSION
+
+package Games::Go::Sgf2Dg::Dg2TkPs;
+use Games::Go::Sgf2Dg::Dg2Tk;
 use Carp;
 
-our @ISA = qw(Exporter Games::Go::Dg2Tk);
+our @ISA = qw(Exporter Games::Go::Sgf2Dg::Dg2Tk);
 
 # Items to export into callers namespace by default. Note: do not export
 # names by default without a very good reason. Use EXPORT_OK instead.
@@ -68,10 +62,6 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
 );
-
-BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 143 $' =~ /(\d+)/;
-}
 
 ######################################################
 #
@@ -209,7 +199,7 @@ __END__
 
 =head1 SEE ALSO
 
-=over 0
+=over
 
 =item L<sgf2dg>(1)
 
@@ -221,19 +211,4 @@ Script to convert SGF format files to Go diagrams
 
 The output is pretty ugly.  Oh well, what can one expect from such a
 simple hack?
-
-=head1 AUTHOR
-
-Reid Augustin, E<lt>reid@hellosix.comE<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2005 by Reid Augustin
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.8.5 or,
-at your option, any later version of Perl 5 you may have available.
-
-=cut
-
 

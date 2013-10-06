@@ -1,13 +1,35 @@
---- #YAML:1.0
-name:                Games-Go-Sgf2Dg
-version:             4.221
-abstract:            sgf2dg (replaces sgf2tex) converts Smart Go Format (SGF) files to Go diagrams - includes the GOOE TeX fonts
-license:             ~
-author:              
-    - Dan Bump <bump@match.stanford.edu>, Reid Augustin <reid@hellosix.com>
-generated_by:        ExtUtils::MakeMaker version 6.42
-distribution_type:   module
-requires:     
+---
+abstract: Sgf2Dg.pm
+author:
+  - 'Reid Augustin <reid@hellosix.com>'
+build_requires:
+  Test::More: 0
+configure_requires:
+  ExtUtils::MakeMaker: 6.30
+dynamic_config: 0
+generated_by: 'Dist::Zilla version 4.300006, CPAN::Meta::Converter version 2.120921'
+license: perl
 meta-spec:
-    url:     http://module-build.sourceforge.net/META-spec-v1.3.html
-    version: 1.3
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Games-Go-Sgf2Dg
+requires:
+  Carp: 0
+  Config: 0
+  Exporter: 0
+  ExtUtils::MakeMaker: 0
+  File::Find: 0
+  File::Slurp: 0
+  File::Spec: 0
+  IO::File: 0
+  PDF::Create: 0
+  POSIX: 0
+  PostScript::File: 0
+  Tk: 0
+  Tk::Canvas: 0
+  Tk::NoteBook: 0
+  constant: 0
+  perl: 5.008
+  strict: 0
+  warnings: 0
+version: 4.249

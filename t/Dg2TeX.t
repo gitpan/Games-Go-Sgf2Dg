@@ -10,8 +10,8 @@ use IO::File;
 use Test::More tests => 17;
 
 BEGIN {
-    use_ok('Games::Go::Dg2TeX');
-    use_ok('Games::Go::Diagram');
+    use_ok('Games::Go::Sgf2Dg::Dg2TeX');
+    use_ok('Games::Go::Sgf2Dg::Diagram');
 };
 
 #########################
@@ -25,13 +25,13 @@ my $dg2tex;
 ## create dg2tex object:
 ##
 my ($tex1, $tex);        # collect TeX here
-eval { $dg2tex = Games::Go::Dg2TeX->new(
+eval { $dg2tex = Games::Go::Sgf2Dg::Dg2TeX->new(
         doubleDigits => 0,
         coords       => 1,
         simple       => 1,
         file         => \$tex1); };
 is( $@, '',                                     'new Dg2TeX object' );
-isa_ok( $dg2tex, 'Games::Go::Dg2TeX',           '   dg2tex is the right class' );
+isa_ok( $dg2tex, 'Games::Go::Sgf2Dg::Dg2TeX',           '   dg2tex is the right class' );
 
 eval {$dg2tex->comment(' comment')};
 is( $@, '',                                     'added comment' );
@@ -94,7 +94,7 @@ is( $dg2tex->convertText('this <is> a {TeX} \conversion_test'),
                                                 'text-to-TeX conversion');
 
 my $diagram;
-eval { $diagram = Games::Go::Diagram->new(
+eval { $diagram = Games::Go::Sgf2Dg::Diagram->new(
                     hoshi             => ['ba', 'cd'],
                     black             => ['ab'],
                     white             => ['dd', 'cd'],

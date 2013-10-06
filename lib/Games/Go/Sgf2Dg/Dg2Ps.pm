@@ -1,42 +1,34 @@
-# $Id: Dg2Ps.pm 213 2008-02-25 08:19:31Z reid $
+#===============================================================================
+#
+#         FILE:  Dg2Ps
+#
+#     ABSTRACT:  convert Games::Go::Sgf2Dg::Diagrams to PostScript
 
-#   Dg2Ps
+#
+#       AUTHOR:  Reid Augustin (REID), <reid@hellosix.com>
+#===============================================================================
 #
 #   Copyright (C) 2005 Reid Augustin reid@hellosix.com
 #                      1000 San Mateo Dr.
 #                      Menlo Park, CA 94025 USA
 #
-#   This library is free software; you can redistribute it and/or modify it
-#   under the same terms as Perl itself, either Perl version 5.8.5 or, at your
-#   option, any later version of Perl 5 you may have available.
-#
-#   This program is distributed in the hope that it will be useful, but
-#   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-#   or FITNESS FOR A PARTICULAR PURPOSE.
-#
-
-=head1 NAME
-
-Games::Go::Dg2Ps - Perl extension to convert Games::Go::Diagrams to
-PostScript.
-
 =head1 SYNOPSIS
 
-use Games::Go::Dg2Ps
+use Games::Go::Sgf2Dg::Dg2Ps
 
- my $dg2ps = B<Games::Go::Dg2Ps-E<gt>new> (options);
+ my $dg2ps = B<Games::Go::Sgf2Dg::Dg2Ps-E<gt>new> (options);
  $dg2ps->convertDiagram($diagram);
 
 =head1 DESCRIPTION
 
-B<Games::Go::Dg2Ps> converts a L<Games::Go::Diagram> into PostScript.
+B<Games::Go::Sgf2Dg::Dg2Ps> converts a L<Games::Go::Sgf2Dg::Diagram> into PostScript.
 
 =cut
 
 use strict;
 require 5.001;
 
-package Games::Go::Dg2Ps;
+package Games::Go::Sgf2Dg::Dg2Ps;
 eval { require PostScript::File; };   # is this module available?
 if ($@) {
     die ("
@@ -46,6 +38,8 @@ if ($@) {
 }
 
 use Carp;
+
+our $VERSION = '4.249'; # VERSION
 
 our @ISA = qw(Exporter);
 
@@ -63,10 +57,6 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
 );
-
-BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 213 $' =~ /(\d+)/;
-}
 
 ######################################################
 #
@@ -115,19 +105,20 @@ use constant BLACK => 0;
 #
 #####################################################
 
-=head1 METHODS
+=head1 NEW
 
 =over 4
 
-=item my $dg2ps = B<Games::Go::Dg2Ps-E<gt>new> (?options?)
+=item my $dg2ps = B<Games::Go::Sgf2Dg::Dg2Ps-E<gt>new> (?options?)
 
-A B<new> Games::Go::Dg2Ps takes the following options:
+=back
 
-=head2 General Dg2 Converter Options:
+A B<new> Games::Go::Sgf2Dg::Dg2Ps takes the following options:
 
-=over 4
+=over 8
 
 =item B<boardSizeX> =E<gt> number
+
 =item B<boardSizeY> =E<gt> number
 
 Sets the size of the board.
@@ -163,7 +154,7 @@ output.
 =item B<diaCoords> =E<gt> sub { # convert $x, $y to Diagram coordinates }
 
 This callback defines a subroutine to convert coordinates from $x,
-$y to whatever coordinates are used in the Games::Go::Diagram
+$y to whatever coordinates are used in the Games::Go::Sgf2Dg::Diagram
 object.  The default B<diaCoords> converts 1-based $x, $y to the
 same coordinates used in SGF format files.  You only need to define
 this if you're using a different coordinate system in the Diagram.
@@ -185,49 +176,49 @@ part of the TeX diagram source.
 
 =back
 
-=head2 Dg2Ps-specific options:
+Dg2Ps-specific options:
 
-=over 4
+=over 8
 
 =item B<pageSize> =E<gt> 'page size'
 
 May be one of:
 
-=over 4
+=over 12
 
-=item 'A0' - 'A9'
+=item . 'A0' - 'A9'
 
-=item 'B0' - 'B10'
+=item . 'B0' - 'B10'
 
-=item 'Executive'
+=item . 'Executive'
 
-=item 'Folio'
+=item . 'Folio'
 
-=item ’Half-Letter’
+=item . ’Half-Letter’
 
-=item 'Letter'
+=item . 'Letter'
 
-=item ’US-Letter’
+=item . ’US-Letter’
 
-=item 'Legal
+=item . 'Legal
 
-=item ’US-Legal’
+=item . ’US-Legal’
 
-=item 'Tabloid'
+=item . 'Tabloid'
 
-=item ’SuperB’
+=item . ’SuperB’
 
-=item 'Ledger'
+=item . 'Ledger'
 
-=item ’Comm #10 Envelope’
+=item . ’Comm #10 Envelope’
 
-=item ’Envelope-Monarch’
+=item . ’Envelope-Monarch’
 
-=item ’Envelope-DL’
+=item . ’Envelope-DL’
 
-=item ’Envelope-C5’
+=item . ’Envelope-C5’
 
-=item ’EuroPostcard’
+=item . ’EuroPostcard’
 
 =back
 
@@ -350,6 +341,10 @@ sub new {
     return($my);
 }
 
+=head1 METHODS
+
+=over 4
+
 =item $dg2ps-E<gt>B<configure> (option =E<gt> value, ?...?)
 
 Change Dg2Ps options from values passed at B<new> time.
@@ -470,7 +465,7 @@ sub comment {
 
 =item my $canvas = $dg2ps-E<gt>B<convertDiagram> ($diagram)
 
-Converts a L<Games::Go::Diagram> into PostScript.
+Converts a L<Games::Go::Sgf2Dg::Diagram> into PostScript.
 
 =cut
 
@@ -1497,7 +1492,7 @@ __END__
 
 =head1 SEE ALSO
 
-=over 0
+=over
 
 =item L<sgf2dg>(1)
 
@@ -1508,18 +1503,4 @@ Script to convert SGF format files to Go diagrams
 =head1 BUGS
 
 Bugs?  In I<my> code?
-
-=head1 AUTHOR
-
-Reid Augustin, E<lt>reid@hellosix.comE<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2005 by Reid Augustin
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.8.5 or,
-at your option, any later version of Perl 5 you may have available.
-
-=cut
 

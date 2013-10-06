@@ -1,34 +1,27 @@
-# $Id: Dg2ASCII.pm 201 2007-06-11 00:38:40Z reid $
-
-#   Dg2ASCII
+#===============================================================================
+#
+#         FILE:  Dg2ASCII
+#
+#     ABSTRACT:  convert Games::Go::Sgf2Dg::Diagrams to ASCII diagrams
+#
+#       AUTHOR:  Reid Augustin (REID), <reid@hellosix.com>
+#===============================================================================
 #
 #   Copyright (C) 2005 Reid Augustin reid@hellosix.com
 #                      1000 San Mateo Dr.
 #                      Menlo Park, CA 94025 USA
 #
-#   This library is free software; you can redistribute it and/or modify it
-#   under the same terms as Perl itself, either Perl version 5.8.5 or, at your
-#   option, any later version of Perl 5 you may have available.
-#
-#   This program is distributed in the hope that it will be useful, but
-#   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-#   or FITNESS FOR A PARTICULAR PURPOSE.
-#
-
-=head1 NAME
-
-Games::Go::Dg2ASCII - Perl extension to convert Games::Go::Diagrams to ASCII diagrams
 
 =head1 SYNOPSIS
 
-use Games::Go::Dg2ASCII
+use Games::Go::Sgf2Dg::Dg2ASCII
 
- my $dg2ascii = B<Games::Go::Dg2ASCII-E<gt>new> (options);
+ my $dg2ascii = B<Games::Go::Sgf2Dg::Dg2ASCII-E<gt>new> (options);
  my $ascii = $dg2ascii->convertDiagram($diagram);
 
 =head1 DESCRIPTION
 
-A Games::Go::Dg2ASCII object converts a L<Games::Go::Diagram> object
+A Games::Go::Sgf2Dg::Dg2ASCII object converts a L<Games::Go::Sgf2Dg::Diagram> object
 into ASCII diagrams.
 
 =cut
@@ -36,8 +29,10 @@ into ASCII diagrams.
 use strict;
 require 5.001;
 
-package Games::Go::Dg2ASCII;
+package Games::Go::Sgf2Dg::Dg2ASCII;
 use Carp;
+
+our $VERSION = '4.249'; # VERSION
 
 our @ISA = qw(Exporter);
 
@@ -55,10 +50,6 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
 );
-
-BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 201 $' =~ /(\d+)/;
-}
 
 ######################################################
 #
@@ -108,19 +99,20 @@ our %options = (
 #
 #####################################################
 
-=head1 METHODS
+=head1 NEW
 
 =over 4
 
-=item my $dg2ascii = B<Games::Go::Dg2ASCII-E<gt>new> (?options?)
+=item my $dg2ascii = B<Games::Go::Sgf2Dg::Dg2ASCII-E<gt>new> (?options?)
 
-A B<new> Games::Go::Dg2ASCII takes the following options:
+=back
 
-=head2 General Dg2 Converter Options:
+A B<new> Games::Go::Sgf2Dg::Dg2ASCII takes the following options:
 
-=over 4
+=over 8
 
 =item B<boardSizeX> =E<gt> number
+
 =item B<boardSizeY> =E<gt> number
 
 Sets the size of the board.
@@ -153,11 +145,11 @@ The edges of the board that should be displayed.  Any portion of the
 board that extends beyond these numbers is not included in the
 output.
 
-=item B<diaCoords> =E<gt> sub { # convert $x, $y to Games::Go::Diagram
+=item B<diaCoords> =E<gt> sub { # convert $x, $y to Games::Go::Sgf2Dg::Diagram
 coordinates }
 
 This callback defines a subroutine to convert coordinates from $x,
-$y to whatever coordinates are used in the Games::Go::Diagram
+$y to whatever coordinates are used in the Games::Go::Sgf2Dg::Diagram
 object.  The default B<diaCoords> converts 1-based $x, $y to the
 same coordinates used in SGF format files.  You only need to define
 this if you're using a different coordinate system in the Diagram.
@@ -224,6 +216,10 @@ sub new {
     $my->configure(%args);
     return($my);
 }
+
+=head1 METHODS
+
+=over 4
 
 =item $dg2tex-E<gt>B<configure> (option =E<gt> value, ?...?)
 
@@ -338,7 +334,7 @@ sub comment {
 
 =item my $dg2ascii-E<gt>B<convertDiagram> ($diagram)
 
-Converts a I<Games::Go::Diagram> into ASCII.  If B<file> was defined
+Converts a I<Games::Go::Sgf2Dg::Diagram> into ASCII.  If B<file> was defined
 in the B<new> method, the ASCII is dumped into the B<file>.  In any
 case, the ASCII is returned as a string scalar.
 
@@ -666,7 +662,7 @@ __END__
 
 =head1 SEE ALSO
 
-=over 0
+=over
 
 =item L<sgf2dg>(1)
 
@@ -677,18 +673,4 @@ Script to convert SGF format files to Go diagrams
 =head1 BUGS
 
 Seems unlikely.
-
-=head1 AUTHOR
-
-Reid Augustin, E<lt>reid@hellosix.comE<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2005 by Reid Augustin
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.8.5 or,
-at your option, any later version of Perl 5 you may have available.
-
-=cut
 

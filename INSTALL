@@ -59,6 +59,12 @@ MakeTeXPK will generate and cache the fonts in pk format.  This
 may take a while. Later prints and previews use the cached fonts,
 saving the font generation time.
 
+Completing font installation in TeX may require tools that are not
+included in a standard TeX installation.  If displaying your output
+document fails with "font not found" messages, you may need to install
+some additional TeX 'utils' package.  Examine the error messages for
+'command not found' for more clues (mktexpk may be the culprit).
+
 SGF2MPOST
 -----------------------------
 

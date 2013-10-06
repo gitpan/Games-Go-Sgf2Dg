@@ -1,5 +1,25 @@
 
-    Change log
+    Change log for Games::Go::Sgf2Dg
+
+from 4.246 to 4.249:
+    installation:
+        move after_build to extra/ dir
+        improved TeX installation
+
+from 4.221 to 4.246:
+    distribution:
+        convert from Subversion to git
+        convert to Dist::Zilla
+        fix directory structure
+    installation:
+        improved finding TeX directories and font installation
+        added a 'clean' target to tex/Makefile
+    code:
+        fix some MetaPost bugs noted by Przemek Wesolek
+        add initialDiagram option
+    documentation:
+        fixed a lot of POD errors
+        minor updates to the manual
 
 from 4.211 to 4.221:
     fixed t/Dg2Tk.t when X server is not available (for automated testing)

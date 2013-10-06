@@ -1,6 +1,14 @@
-package Games::Go::Dg2SL;
+#===============================================================================
+#
+#         FILE:  Dg2SL
+#
+#     ABSTRACT:  
+#
+#       AUTHOR:  Marcel Gruenauer, <marcel@cpan.org>
+#===============================================================================
 
-# $Id: Dg2SL.pm 171 2007-04-14 04:31:46Z reid $
+package Games::Go::Sgf2Dg::Dg2SL;
+
 #
 # sgf2dg -converter SL $(sgf_bounds.pl foo.sgf) -m 10 -n foo.sgf
 
@@ -8,6 +16,8 @@ use warnings;
 use strict;
 require 5.001;
 use Carp;
+
+our $VERSION = '4.249'; # VERSION
 
 our @ISA = qw(Exporter);
 
@@ -25,10 +35,6 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
 );
-
-BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 001 $' =~ /(\d+)/;
-}
 
 ######################################################
 #
@@ -170,7 +176,7 @@ sub convertDiagram {
 
     unless ($self->{firstDone}) {
         $self->comment(<<EOCOMMENT);
-[maruseru]: ''The content of this page has been generated from an SGF file by sgf2dg using the Games::Go::Dg2SL converter. You can edit it and I might "master edit" the SGF file and then regenerate this page. After regeneration, all discussion will have been lost. This is considered a feature, not a bug. :)''
+[maruseru]: ''The content of this page has been generated from an SGF file by sgf2dg using the Games::Go::Sgf2Dg::Dg2SL converter. You can edit it and I might "master edit" the SGF file and then regenerate this page. After regeneration, all discussion will have been lost. This is considered a feature, not a bug. :)''
 
 EOCOMMENT
 
@@ -591,7 +597,7 @@ sub _get_numbered_stone_intersections {
 
 sub _print_setup_diagram {
     my ($self, $name, $diagram) = @_;
-    my $setup_diagram = Games::Go::Diagram->new;
+    my $setup_diagram = Games::Go::Sgf2Dg::Diagram->new;
     # copy black and white stones, and hoshi points.
     my $did_find_stones = 0;
     foreach my $y (1 .. $self->{boardSize}) {
@@ -678,18 +684,18 @@ __END__
 
 =head1 NAME
 
-Games::Go::Dg2SL - Perl extension to convert Games::Go::Diagrams to Sensei's Library format
+Games::Go::Sgf2Dg::Dg2SL - Perl extension to convert Games::Go::Sgf2Dg::Diagrams to Sensei's Library format
 
 =head1 SYNOPSIS
 
-use Games::Go::Dg2SL
+use Games::Go::Sgf2Dg::Dg2SL
 
- my $dg2sl = B<Games::Go::Dg2SL-E<gt>new> (options);
+ my $dg2sl = B<Games::Go::Sgf2Dg::Dg2SL-E<gt>new> (options);
  my $sl = $dg2sl->convertDiagram($diagram);
 
 =head1 DESCRIPTION
 
-A Games::Go::Dg2SL object converts a L<Games::Go::Diagram> object into
+A Games::Go::Sgf2Dg::Dg2SL object converts a L<Games::Go::Sgf2Dg::Diagram> object into
 Sensei's Library diagrams (see http://senseis.xmp.net/).
 
 Sensei's Library diagrams only support move numbers from 1-10, so make sure
@@ -710,19 +716,17 @@ not the whole diagram. This is useful for analyses of local positions, but
 if the first ten moves of a real game are all in one corner - however
 unlikely that may be -, it would produce undesirable results.
 
-=cut
-
-=head1 METHODS
+=head1 NEW
 
 =over 4
 
-=item my $dg2sl = B<Games::Go::Dg2SL-E<gt>new> (?options?)
+=item my $dg2sl = B<Games::Go::Sgf2Dg::Dg2SL-E<gt>new> (?options?)
 
-A B<new> Games::Go::Dg2SL takes the following options:
+=back
 
-=head2 General Dg2 Converter Options:
+A B<new> Games::Go::Sgf2Dg::Dg2SL takes the following options:
 
-=over 4
+=over 8
 
 =item B<boardSize> =E<gt> number
 
@@ -748,11 +752,11 @@ The edges of the board that should be displayed.  Any portion of the
 board that extends beyond these numbers is not included in the
 output.
 
-=item B<diaCoords> =E<gt> sub { # convert $x, $y to Games::Go::Diagram
+=item B<diaCoords> =E<gt> sub { # convert $x, $y to Games::Go::Sgf2Dg::Diagram
 coordinates }
 
 This callback defines a subroutine to convert coordinates from $x,
-$y to whatever coordinates are used in the Games::Go::Diagram
+$y to whatever coordinates are used in the Games::Go::Sgf2Dg::Diagram
 object.  The default B<diaCoords> converts 1-based $x, $y to the
 same coordinates used in SGF format files.  You only need to define
 this if you're using a different coordinate system in the Diagram.
@@ -805,13 +809,13 @@ part of the Sensei's Library diagram lines.
 
 =back
 
-=cut
+=head1 METHODS
+
+=over 4
 
 =item $dg2sl-E<gt>B<configure> (option =E<gt> value, ?...?)
 
 Change Dg2SL options from values passed at B<new> time.
-
-=cut
 
 =item my $coord = $dg2mp-E<gt>B<diaCoords> ($x, $y)
 
@@ -821,16 +825,11 @@ $y).  For example, to get a specific intersection structure:
 
     my $int = $diagram->get($dg2mp->diaCoords(3, 4));
 
-=cut
-
-
 =item $dg2sl-E<gt>B<print> ($text ? , ... ?)
 
 B<print>s the input $text directly to B<file> as defined at B<new>
 time.  Whether or not B<file> was defined, B<print> accumulates the
 $text for later retrieval with B<converted>.
-
-=cut
 
 =item my $sl = $dg2sl-E<gt>B<converted> ($replacement)
 
@@ -838,22 +837,18 @@ Returns the entire Sensei's Library diagram converted so far for the B<Dg2SL>
 object. If $replacement is defined, the accumulated Sensei's Library is
 replaced by $replacement.
 
-=cut
-
 =item $dg2sl-E<gt>B<comment> ($comment ? , ... ?)
 
 Inserts the comment character (which is nothing for Sensei's Library) in front
 of each line of each comment and B<print>s it to B<file>.
 
-=cut
 
 =item my $dg2sl-E<gt>B<convertDiagram> ($diagram)
 
-Converts a I<Games::Go::Diagram> into Sensei's Library. If B<file> was defined
+Converts a I<Games::Go::Sgf2Dg::Diagram> into Sensei's Library. If B<file> was defined
 in the B<new> method, the Sensei's Library is dumped into the B<file>.  In any
 case, the Sensei's Library is returned as a string scalar.
 
-=cut
 
 =item my $sl = $dg2sl-E<gt>B<convertText> ($text)
 
@@ -863,7 +858,6 @@ really just a place-holder for more complicated converters.
 
 Returns the converted text.
 
-=cut
 
 =item $title = $dg2sl-E<gt>B<convertGameProps> (\%sgfHash)
 
@@ -919,20 +913,16 @@ Both long and short property names are recognized, and all
 unrecognized properties are ignored with no warnings.  Note that
 these properties are all intended as game-level notations.
 
-=cut
-
 =item $dg2sl-E<gt>B<close>
 
 B<print>s any final text to the diagram (currently none) and closes
 the dg2sl object.  Also closes B<file> if appropriate.
 
-=cut
-
 =back
 
 =head1 SEE ALSO
 
-=over 0
+=over
 
 =item L<sgf2dg>(1)
 
@@ -955,6 +945,3 @@ Copyright (C) 2007 by Marcel Gruenauer.
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.5 or,
 at your option, any later version of Perl 5 you may have available.
-
-=cut
-

@@ -722,8 +722,8 @@ handicap stones, this option may fix it.
 
 {\tt -converter} selects the output converter.  See the next section
 for more details on converters.  The default converter is {\tt
-Games::Go::Dg2Tex} which creates source for \TeX.  Converters get
-'{\tt Games::Go::Dg2}' prepended, so enter only the part after {\tt Games::Go::Dg2}.
+Games::Go::Sgf2Dg::Dg2Tex} which creates source for \TeX.  Converters get
+'{\tt Games::Go::Sgf2Dg::Dg2}' prepended, so enter only the part after {\tt Games::Go::Sgf2Dg::Dg2}.
 The default is thus equivilent to {\tt -converter TeX}.
 
 The remaining options apply only to the {\tt Dg2TeX} converter.
@@ -774,7 +774,7 @@ roman font}, so it is impossible to print them without changing fonts, or
 because the characters have special meaning to \TeX\ (see {\it The \TeX\
 Book} page 38). Instead of using the characters directly, {\tt Dg2TeX}
 makes plausible substitutions.  When {\tt texComments} is specified, the
-mappings are supressed so you can embed normal \TeX\ source (like {\tt
+mappings are suppressed so you can embed normal \TeX\ source (like {\tt
 \char'173\\bf boldface\char'175}) directly inside the comments.
 
 {\tt -floatControl (Dg2TeX)} is followed by a control string.  In normal
@@ -810,14 +810,14 @@ converters available with the current distribution are:
 \centerline{
 \vbox{
 \halign{#\qquad&#\hfil\cr
-{\tt Games::Go::Dg2TeX}     &\TeX\ source (default)\cr
-{\tt Games::Go::Dg2Mp}      &MetaPost embedded in \TeX\ (Encapsulated PostScript)\cr
-{\tt Games::Go::Dg2ASCII}   &simple ASCII diagrams\cr
-{\tt Games::Go::Dg2Ps}      &PostScript\cr
-{\tt Games::Go::Dg2PDF}     &Portable Document Format (PDF)\cr
-{\tt Games::Go::Dg2Tk}      &Perl/Tk NoteBook/Canvas\cr
-{\tt Games::Go::Dg2TkPs}    &PostScript via Dg2Tk (Dg2Ps is nicer)\cr
-{\tt Games::Go::Dg2SL}      &Sensei's Library (thanks to Marcel Gruenauer\cr
+{\tt Games::Go::Sgf2Dg::Dg2TeX}     &\TeX\ source (default)\cr
+{\tt Games::Go::Sgf2Dg::Dg2Mp}      &MetaPost embedded in \TeX\ (Encapsulated PostScript)\cr
+{\tt Games::Go::Sgf2Dg::Dg2ASCII}   &simple ASCII diagrams\cr
+{\tt Games::Go::Sgf2Dg::Dg2Ps}      &PostScript\cr
+{\tt Games::Go::Sgf2Dg::Dg2PDF}     &Portable Document Format (PDF)\cr
+{\tt Games::Go::Sgf2Dg::Dg2Tk}      &Perl/Tk NoteBook/Canvas\cr
+{\tt Games::Go::Sgf2Dg::Dg2TkPs}    &PostScript via Dg2Tk (Dg2Ps is nicer)\cr
+{\tt Games::Go::Sgf2Dg::Dg2SL}      &Sensei's Library (thanks to Marcel Gruenauer\cr
 }}}
 \medbreak
 
@@ -828,7 +828,7 @@ a copy of an existing converter (Dg2ASCII.pm for example) and
 modify it.  Once it's working, please be sure to send us a copy so
 we can add it to the distribution.
 
-Converters are always prepended with 'Games::Go::Dg2', so to select
+Converters are always prepended with 'Games::Go::Sgf2Dg::Dg2', so to select
 the ASCII converter instead of the default \TeX\ converter, use:
 \vglue.12in
     {\tt sgf2dg ... -converter ASCII ...}
@@ -858,14 +858,14 @@ Executing:
     {\tt \$ sgf2Xyz foo.sgf [ options ]}
 \vglue.12in
 \noindent
-attempts to use {\tt Games::Go::Dg2Xyz} as the converter.  The
+attempts to use {\tt Games::Go::Sgf2Dg::Dg2Xyz} as the converter.  The
 converter name extracted from the script name is case sensitive.
 
 % Rewritten to avoid a bad page break
 
 The three extracted names {\tt tex}, {\tt diagram} and {\tt dg}
 are treated specially. These three names always attempt to use {\tt
-Games::Go::Dg2TeX} as the converter.
+Games::Go::Sgf2Dg::Dg2TeX} as the converter.
 
 % Note that three extracted names are treated specially:
 % \vglue.12in
@@ -876,14 +876,14 @@ Games::Go::Dg2TeX} as the converter.
 %     {\tt dg}
 % \vglue.12in
 % These three names (when extracted from the script name) always
-% attempt to use {\tt Games::Go::Dg2TeX} as the converter.
+% attempt to use {\tt Games::Go::Sgf2Dg::Dg2TeX} as the converter.
 
 \vfil\eject
 \centerline{\titlefont Converter Options}
 \vglue.18in
 
 Converter options are prepended with the converter name so that
-option {\tt xyz} for converter {\tt Games::Go::Dg2Abc} is written on
+option {\tt xyz} for converter {\tt Games::Go::Sgf2Dg::Dg2Abc} is written on
 the command line as:
 \vglue.12in
     {\tt \$ sgf2dg ... -Abc-xyz ...}
@@ -910,7 +910,7 @@ be prepended with {\tt -TeX-}.
 See the {\tt man} or {\tt perldoc} pages for converter-specific
 options.  eg:
 \vglue.12in
-    {\tt perldoc Games::Go::Dg2PDF}.
+    {\tt perldoc Games::Go::Sgf2Dg::Dg2PDF}.
 \vglue.12in
 Of the converters available with this release, {\tt Dg2ASCII} takes
 no additional options.  {\tt Dg2Tk} and therefore {\tt Dg2TkPs} take

@@ -22,14 +22,14 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
 #
-# $Id: mps2eps 142 2005-06-02 01:21:44Z reid $
+# $Id$
 #
 # Bugs and comments can be reported to Jon Edvardsson <joned@ida.liu.se>.
 
 
 PROG=`basename $0`
 PROGNAME="MPS2EPS";
-REVISION='$Revision: 142 $'
+REVISION='$Revision$'
 VERSION=`echo $REVISION|awk '{print $2}'`
 COPYRIGHT="Copyright (C) 2003 Jon Edvardsson."
 LICENSE="Released under GNU General Public License."

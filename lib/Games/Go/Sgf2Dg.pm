@@ -1,29 +1,39 @@
-#! /usr/bin/perl -w
-
-# perl code to turn an SGF file into diagrams
+#===============================================================================
+#
+#      PODNAME:  Sgf2Dg.pm
+#     ABSTRACT:  Sgf2Dg.pm
+#     ABSTRACT:  turn Smart Go Format (SGF) files into diagrams
+#
+#       AUTHOR:  Reid Augustin (REID), <reid@hellosix.com>
+#===============================================================================
+#
+#   perl code to turn an SGF file into diagrams
+#
 #   Copyright (C) 1997-2005 Reid Augustin reid@hellosix.com
 #                      1000 San Mateo Dr.
 #                      Menlo Park, CA 94025 USA
 #
-#   This program is free software; you can redistribute it and/or modify
-#   it under the terms of the GNU General Public License as published by
-#   the Free Software Foundation; either version 2 of the License, or
-#   (at your option) any later version.
-#
-#   This program is distributed in the hope that it will be useful,
-#   but WITHOUT ANY WARRANTY; without even the implied warranty of
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#   GNU General Public License for more details.
-#
-#   You should have received a copy of the GNU General Public License
-#   along with this program; if not, write to the Free Software
-#   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111, USA
 
-# todo: 
+use 5.005;
+use strict;
+use warnings;
+
+package Games::Go::Sgf2Dg;
+
+use Exporter 'import';
+use IO::File;
+use File::Spec;
+use Games::Go::Sgf2Dg::Diagram; # the go diagram module
+
+our $VERSION = '4.249'; # VERSION
+my $VERSION = 'pre-relase'; # delete this line after build
+
+our @EXPORT_OK = qw(
+    );
 
 =head1 NAME
 
-sgf2dg - convert Smart Go Format (SGF) files to diagrams similar to
+Games::Go::Sgf2Dg - convert Smart Go Format (SGF) files to diagrams similar to
 those seen in Go books and magazines.
 
 =head1 SYNOPSIS
@@ -32,10 +42,16 @@ sgf2dg [ option ... ] file[.sgf|.mgt]
 
 =head1 DESCRIPTION
 
-B<sgf2dg> takes a Smart Go Format (SGF) file I<filename> or
+B<Games::Go::Sgf2Dg> takes a Smart Go Format (SGF) file I<filename> or
 I<filename>.sgf or I<filename>.mgt and produces a diagram file
 I<filename>.suffix where suffix is determined by the B<converter>
 (see below).
+
+B<Games::Go::Sgf2Dg> modualizes the sgf2dg script.  As such, it parses the
+command line (B<@ARGV>) directly, and has only one callable method: B<run>,
+called as follows (by the sgf2dg script):
+
+    Games::Go::Sgf2Dg->run;
 
 The default B<converter> is Dg2TeX which converts the Diagram to TeX
 source code (sgf2dg is a superset replacement for the sgf2tex script
@@ -47,23 +63,10 @@ documents.
 
 =cut
 
-use strict;
-require 5.001;
-use IO::File;
-use Games::Go::Diagram; # the go diagram module
-
-BEGIN {
-    our $VERSION = sprintf "4.%03d", '$Revision: 221 $' =~ /(\d+)/;
-}
 
 use constant a_MINUS_1 => ord('a') - 1; # base of SGF coordinates is 'a'
 
-my $version = sprintf "version 4.%03d", '$Revision: 221 $' =~ /(\d+)/;
-
-my $myName = $0;             # full pathname of this file
-$myName =~ s".*/"";          # delete any preceding path
-
-$version = "(sgf2dg) $version" if($myName ne 'sgf2dg');
+my (undef, undef, $myName) = File::Spec->splitpath($0);
 
 my $commandLine = "$0 " . join(' ', @ARGV);
 
@@ -96,6 +99,7 @@ $myName [options] [file.sgf]
     -ia | -ignoreAll           ignore SGF comments, letters, marks, variations, and passes
     -firstDiagram              first diagram to print
     -lastDiagram               last diagram to print
+    -initialDiagram            print initial setup diagram
     -placeHandi                place handicap stones on board (old style)
     -coords                    print coordinates
     -cs | -coordStyle style    coordinate style: normal, sgf, or numeric
@@ -157,7 +161,7 @@ $myName [options] [file.sgf]
  contain the explicit AB notations.
 
     -converter changes the output converter.  The default converter
- is Games::Go::Dg2Tex.  All converters get 'Games::Go::Dg2'
+ is Games::Go::Sgf2Dg::Dg2Tex.  All converters get 'Games::Go::Sgf2Dg::Dg2'
  prepended, so you should enter only the part after Dg2.  The
  default is thus equivilent to '-converter TeX'.  Converters
  supplied with this release are (case sensitive):
@@ -174,7 +178,7 @@ $myName [options] [file.sgf]
     Example:    \$ $myName ... -converter ASCII ...
 
     See the perldoc or man pages for details on converter-specific
- options (eg: 'perldoc Games::Go::Dg2TeX' or 'man Games::Go::Dg2PDF').
+ options (eg: 'perldoc Games::Go::Sgf2Dg::Dg2TeX' or 'man Games::Go::Sgf2Dg::Dg2PDF').
 
     -simple (Dg2TeX) uses a very simple TeX format. This option may be
  useful if you intend to edit the resulting TeX file by hand.
@@ -386,6 +390,14 @@ sub SGF_ProcessVariation {
             while (@nodePlays) {
                 my $coords = shift @nodePlays;
                 CheckForDeadGroups(SGF2Coords($coords));    # check for captures
+            }
+        }
+        # initialDiagram option patch from Marcel Gr?nauer <hanekomu@gmail.com> Sun, 12 Jul 2009
+        if ($option{initialDiagram}) {
+            unless (our $did_print_initial_diagram) {
+                $diagram->{actions_done}++;
+                finishDiagram($diagram, 'initial diagram');
+                $did_print_initial_diagram++;
             }
         }
         if ((@{$option{breakList}} > 0) and
@@ -1030,37 +1042,38 @@ sub convertDiagram {
     }
 }
 
-#
-# OK, now we've got everything defined, we can start executing stuff
 
-#
-# set the defaults
-#
-$option{topLine} = $option{leftLine} = 1;
-$option{bottomLine} = $option{rightLine} = 19;
-$option{varNumbersFlag} = 'relative';
-$option{doubleDigits} = 0;
-$option{repeatLast} = 0;
-$option{newNumbers} = 0;
-$option{firstDiagram} = 1;
-$option{lastDiagram} = 10000;
-$option{boardSizeX} = 19;
-$option{boardSizeY} = 19;
-$option{coords_style} = 'normal';   # standard coordinate style
-$option{breakList} = [];
-$option{coords} = 0;
-$option{coordStyle} = 'normal';
-$option{floatControl} = 'rx';
-$option{verbose} = 0;
-$option{placeHandi} = 0;
+sub set_defaults {
+    #
+    # set the defaults
+    #
+    $option{topLine} = $option{leftLine} = 1;
+    $option{bottomLine} = $option{rightLine} = 19;
+    $option{varNumbersFlag} = 'relative';
+    $option{doubleDigits} = 0;
+    $option{repeatLast} = 0;
+    $option{newNumbers} = 0;
+    $option{firstDiagram} = 1;
+    $option{lastDiagram} = 10000;
+    $option{initialDiagram} = 0;
+    $option{boardSizeX} = 19;
+    $option{boardSizeY} = 19;
+    $option{coords_style} = 'normal';   # standard coordinate style
+    $option{breakList} = [];
+    $option{coords} = 0;
+    $option{coordStyle} = 'normal';
+    $option{floatControl} = 'rx';
+    $option{verbose} = 0;
+    $option{placeHandi} = 0;
 
-$option{converter} = 'TeX';
+    $option{converter} = 'TeX';
 
-if ($myName =~ m/sgf2(.*)/) {
-    if (($1 ne 'tex') and
-        ($1 ne 'diagram') and
-        ($1 ne 'dg')) {
-        $option{converter} = $1;
+    if ($myName =~ m/sgf2(.*)/) {
+        if (($1 ne 'tex') and
+            ($1 ne 'diagram') and
+            ($1 ne 'dg')) {
+            $option{converter} = $1;
+        }
     }
 }
 
@@ -1179,21 +1192,21 @@ with the current distribution package are:
 
 =over 4
 
-=item   L<Games::Go::Dg2TeX>       TeX source (default)
+=item   L<Games::Go::Sgf2Dg::Dg2TeX>       TeX source (default)
 
-=item   L<Games::Go::Dg2Mp>        MetaPost embedded in TeX
+=item   L<Games::Go::Sgf2Dg::Dg2Mp>        MetaPost embedded in TeX
 
-=item   L<Games::Go::Dg2ASCII>     simple ASCII diagrams
+=item   L<Games::Go::Sgf2Dg::Dg2ASCII>     simple ASCII diagrams
 
-=item   L<Games::Go::Dg2PDF>       Portable Document Format (PDF)
+=item   L<Games::Go::Sgf2Dg::Dg2PDF>       Portable Document Format (PDF)
 
-=item   L<Games::Go::Dg2Ps>        PostScript
+=item   L<Games::Go::Sgf2Dg::Dg2Ps>        PostScript
 
-=item   L<Games::Go::Dg2Tk>        Perl/Tk NoteBook/Canvas
+=item   L<Games::Go::Sgf2Dg::Dg2Tk>        Perl/Tk NoteBook/Canvas
 
-=item   L<Games::Go::Dg2TkPs>      PostScript via Dg2Tk (Dg2Ps is prefered)
+=item   L<Games::Go::Sgf2Dg::Dg2TkPs>      PostScript via Dg2Tk (Dg2Ps is prefered)
 
-=item   L<Games::Go::Dg2SL>        Sensei's Library (by Marcel Gruenauer)
+=item   L<Games::Go::Sgf2Dg::Dg2SL>        Sensei's Library (by Marcel Gruenauer)
 
 =back
 
@@ -1204,7 +1217,7 @@ probably to grab a copy of Dg2Ps.pm (for example) and modify it.
 Once it's working, please be sure to send us a copy so we can add it
 to the distribution.
 
-Converters are always prepended with 'Games::Go::Dg2', so to select
+Converters are always prepended with 'Games::Go::Sgf2Dg::Dg2', so to select
 the ASCII converter instead of the default TeX converter, use:
 
     -converter ASCII
@@ -1232,7 +1245,7 @@ Executing:
 
     $ sgf2Xyz foo.sgf [ options ]
 
-attempts to use Games::Go::Dg2Xyz as the B<converter>.  The
+attempts to use Games::Go::Sgf2Dg::Dg2Xyz as the B<converter>.  The
 B<converter> name extracted from the script name is case sensitive.
 
 Note that three extracted names are treated specially:
@@ -1248,7 +1261,7 @@ Note that three extracted names are treated specially:
 =back
 
 These three names (when extracted from the script name) always
-attempt to use Games::Go::Dg2TeX as the B<converter>.
+attempt to use Games::Go::Sgf2Dg::Dg2TeX as the B<converter>.
 
 =back
 
@@ -1259,7 +1272,7 @@ includes converter plugin modules that are included with the Sgf2Dg
 distribution.
 
 Converter options are prepended with the converter name so that
-option xyz for converter Games::Go::Dg2Abc is written on the command
+option xyz for converter Games::Go::Sgf2Dg::Dg2Abc is written on the command
 line as:
 
     $ sgf2dg ... -Abc-xyz ...
@@ -1290,11 +1303,11 @@ creation time (which is why the example above works).
 For more information about converter-specific options, please refer
 to the perldoc or manual pages:
 
-    $ perldoc Games::Go::Dg2PDF
+    $ perldoc Games::Go::Sgf2Dg::Dg2PDF
 
 or
 
-    $ man Games::Go::Dg2Ps
+    $ man Games::Go::Sgf2Dg::Dg2Ps
 
 =head2 Dg2TeX options
 
@@ -1359,241 +1372,254 @@ right (text on the left) and all remaining diagrams are placed randomly.
 # parse the command line arguments:
 #
 my ($inHandle, $outHandle,  $inFileName, $outFileName);
-my ($arg, @unknownOpt);
-while (scalar(@ARGV)) {
-    $arg = shift(@ARGV);
-    if (($arg eq '-d') or ($arg eq '-doubleDigits')) {
-        $option{doubleDigits} = 1 
-    } elsif (($arg eq '-i') or ($arg eq '-in')) {
-        $inFileName = shift(@ARGV);
-    } elsif (($arg eq '-o') or ($arg eq '-out')) {
-        $outFileName = shift(@ARGV);
-    } elsif (($arg eq '-m') or ($arg eq '-movesPerDiagram')) {
-        $option{movesPerDiagram} = shift(@ARGV);
-    } elsif (($arg eq '-n') or ($arg eq '-newNumbers')) {
-        $option{newNumbers} = 1;
-    } elsif (($arg eq '-av') or ($arg eq '-absoluteVarNums')) {
-        $option{varNumbersFlag} = 'absolute';
-    } elsif (($arg eq '-rv') or ($arg eq '-relativeVarNums')) {
-        $option{varNumbersFlag} = 'relative';
-    } elsif (($arg eq '-cv') or ($arg eq '-correlativeVarNums')) {
-        $option{varNumbersFlag} = 'correlative';
-    } elsif (($arg eq '-im') or ($arg eq '-ignoreMarks')) {
-        $option{ignoreMarks} = 1;
-    } elsif (($arg eq '-ic') or ($arg eq '-ignoreComments')) {
-        $option{ignoreComments} = 1;
-    } elsif (($arg eq '-il') or ($arg eq '-ignoreLetters')) {
-        $option{ignoreLetters} = 1;
-    } elsif (($arg eq '-ip') or ($arg eq '-ignorePass')) {
-        $option{ignorePass} = 1;
-    } elsif (($arg eq '-iv') or ($arg eq '-ignoreVariations')) {
-        $option{ignoreVariations} = 1;
-    } elsif (($arg eq '-ia') or ($arg eq '-ignoreAll')) {
-        $option{ignoreVariations} = 1;
-        $option{ignoreComments} = 1;
-        $option{ignoreLetters} = 1;
-        $option{ignoreMarks} = 1;
-        $option{ignorePass} = 1;
-    } elsif (($arg eq '-rl') or ($arg eq '-repeatLast')) {
-        $option{repeatLast} = 1;
-    } elsif (($arg eq '-break') or ($arg eq '-breakList')) {
-        @{$option{breakList}} = sort {$::a <=> $::b} (split(/,/, shift(@ARGV)));
-    } elsif (($arg eq '-t') or ($arg eq '-top')) {
-        $option{topLine} = shift(@ARGV);
-    } elsif (($arg eq '-b') or ($arg eq '-bottom')) {
-        $option{bottomLine} = shift(@ARGV);
-    } elsif (($arg eq '-l') or ($arg eq '-left')) {
-        $option{leftLine} = shift(@ARGV);
-    } elsif (($arg eq '-r') or ($arg eq '-right')) {
-        $option{rightLine} = shift(@ARGV);
-    } elsif ($arg eq '-crop') {
-        $option{crop} = 1;
-    } elsif ($arg eq "-placeHandi") {
-        $option{placeHandi} = 1;
-    } elsif ($arg eq "-coords") {
-        $option{coords} = 1;
-    } elsif (($arg eq '-cs') or ($arg eq "-coordStyle")) {
-        $option{coordStyle} = lc(shift(@ARGV));
-        my %legal = (normal => 1, sgf    => 1,
-                     '++'   => 1, '+-'   => 1,
-                     '-+'   => 1, '--'   => 1);
-        unless (exists($legal{$option{coordStyle}})) {
-            die "illegal coordStyle: $option{coordStyle}, must be: normal, sgf, ++, +-, -+, or --\n";
-        }
-    } elsif ($arg eq '-firstDiagram') {
-        $option{firstDiagram} = shift(@ARGV);
-    } elsif ($arg eq '-lastDiagram') {
-        $option{lastDiagram} = shift(@ARGV);
-    } elsif (($arg eq '-h') or ($arg eq '-help')) {
-        print($help);
-        exit(0);
-    } elsif (($arg eq '-v')or($arg eq '-version')) {
-        print("$myName $version\n");
-        exit(0);
-    } elsif ($arg eq '-verbose') {
-        $option{verbose} = 1;
-    } elsif (($arg eq '-converter') or
-             ($arg eq '-convert')) {
-        $option{converter} = shift(@ARGV);
-        $option{converter} =~ s/.*Games::Go::Dg2//;
-    } elsif ($arg eq '-texComments') {
-        $option{converterOption}{texComments} = 1;
-    } elsif ($arg eq '-bigFonts') {
-        $option{converterOption}{bigFonts} = 1;
-    } elsif ($arg eq '-simple') {
-        $option{converterOption}{simple} = 1;
-    } elsif ($arg eq '-mag') {
-        $option{converterOption}{mag} = shift(@ARGV);
-    } elsif ($arg eq '-twoColumn') {
-        $option{converterOption}{twoColumn} = 1;
-    } elsif ($arg eq "-floatControl") {
-        unless (@ARGV) {
-            die("Please specify a control_string for the floatControl option\n")
-        }
-        $option{converterOption}{floatControl} = lc(shift(@ARGV));
-    } elsif (substr($arg, 0, 1) eq '-') {
-        push(@unknownOpt, $arg);        # worry about it later...
-    } else {
-        $inFileName = $arg;
-    }
-}
 
-foreach (@unknownOpt) {
-    if (m/^-$option{converter}-(.*)/) {
-        my $cnvOpt = $1;
-        if ($cnvOpt =~ m/(\S+)\s+(.*)/) {
-            $option{converterOption}{$1} = $2;
+sub parse_command_line {
+    my ($arg, @unknownOpt);
+    while (scalar(@ARGV)) {
+        $arg = shift(@ARGV);
+        if (($arg eq '-d') or ($arg eq '-doubleDigits')) {
+            $option{doubleDigits} = 1 
+        } elsif (($arg eq '-i') or ($arg eq '-in')) {
+            $inFileName = shift(@ARGV);
+        } elsif (($arg eq '-o') or ($arg eq '-out')) {
+            $outFileName = shift(@ARGV);
+        } elsif (($arg eq '-m') or ($arg eq '-movesPerDiagram')) {
+            $option{movesPerDiagram} = shift(@ARGV);
+        } elsif (($arg eq '-n') or ($arg eq '-newNumbers')) {
+            $option{newNumbers} = 1;
+        } elsif (($arg eq '-av') or ($arg eq '-absoluteVarNums')) {
+            $option{varNumbersFlag} = 'absolute';
+        } elsif (($arg eq '-rv') or ($arg eq '-relativeVarNums')) {
+            $option{varNumbersFlag} = 'relative';
+        } elsif (($arg eq '-cv') or ($arg eq '-correlativeVarNums')) {
+            $option{varNumbersFlag} = 'correlative';
+        } elsif (($arg eq '-im') or ($arg eq '-ignoreMarks')) {
+            $option{ignoreMarks} = 1;
+        } elsif (($arg eq '-ic') or ($arg eq '-ignoreComments')) {
+            $option{ignoreComments} = 1;
+        } elsif (($arg eq '-il') or ($arg eq '-ignoreLetters')) {
+            $option{ignoreLetters} = 1;
+        } elsif (($arg eq '-ip') or ($arg eq '-ignorePass')) {
+            $option{ignorePass} = 1;
+        } elsif (($arg eq '-iv') or ($arg eq '-ignoreVariations')) {
+            $option{ignoreVariations} = 1;
+        } elsif (($arg eq '-ia') or ($arg eq '-ignoreAll')) {
+            $option{ignoreVariations} = 1;
+            $option{ignoreComments} = 1;
+            $option{ignoreLetters} = 1;
+            $option{ignoreMarks} = 1;
+            $option{ignorePass} = 1;
+        } elsif (($arg eq '-rl') or ($arg eq '-repeatLast')) {
+            $option{repeatLast} = 1;
+        } elsif (($arg eq '-break') or ($arg eq '-breakList')) {
+            my $breaks = '';
+            while (@ARGV and
+                   $ARGV[0] =! m/[\d,]*/) {
+                $breaks .= shift @ARGV;
+            }
+            @{$option{breakList}} = sort {$a <=> $b} split(/,/, $breaks);
+        } elsif (($arg eq '-t') or ($arg eq '-top')) {
+            $option{topLine} = shift(@ARGV);
+        } elsif (($arg eq '-b') or ($arg eq '-bottom')) {
+            $option{bottomLine} = shift(@ARGV);
+        } elsif (($arg eq '-l') or ($arg eq '-left')) {
+            $option{leftLine} = shift(@ARGV);
+        } elsif (($arg eq '-r') or ($arg eq '-right')) {
+            $option{rightLine} = shift(@ARGV);
+        } elsif ($arg eq '-crop') {
+            $option{crop} = 1;
+        } elsif ($arg eq "-placeHandi") {
+            $option{placeHandi} = 1;
+        } elsif ($arg eq "-coords") {
+            $option{coords} = 1;
+        } elsif (($arg eq '-cs') or ($arg eq "-coordStyle")) {
+            $option{coordStyle} = lc(shift(@ARGV));
+            my %legal = (normal => 1, sgf    => 1,
+                        '++'   => 1, '+-'   => 1,
+                        '-+'   => 1, '--'   => 1);
+            unless (exists($legal{$option{coordStyle}})) {
+                die "illegal coordStyle: $option{coordStyle}, must be: normal, sgf, ++, +-, -+, or --\n";
+            }
+        } elsif ($arg eq '-firstDiagram') {
+            $option{firstDiagram} = shift(@ARGV);
+        } elsif ($arg eq '-lastDiagram') {
+            $option{lastDiagram} = shift(@ARGV);
+        } elsif (($arg eq '-h') or ($arg eq '-help')) {
+            print($help);
+            exit(0);
+        } elsif (($arg eq '-v')or($arg eq '-version')) {
+            print("$myName $VERSION\n");
+            exit(0);
+        } elsif ($arg eq '-verbose') {
+            $option{verbose} = 1;
+        } elsif (($arg eq '-converter') or
+                ($arg eq '-convert')) {
+            $option{converter} = shift(@ARGV);
+            $option{converter} =~ s/.*Games::Go::Sgf2Dg::Dg2//;
+        } elsif ($arg eq '-texComments') {
+            $option{converterOption}{texComments} = 1;
+        } elsif ($arg eq '-bigFonts') {
+            $option{converterOption}{bigFonts} = 1;
+        } elsif ($arg eq '-simple') {
+            $option{converterOption}{simple} = 1;
+        } elsif ($arg eq '-mag') {
+            $option{converterOption}{mag} = shift(@ARGV);
+        } elsif ($arg eq '-twoColumn') {
+            $option{converterOption}{twoColumn} = 1;
+        } elsif ($arg eq "-floatControl") {
+            unless (@ARGV) {
+                die("Please specify a control_string for the floatControl option\n")
+            }
+            $option{converterOption}{floatControl} = lc(shift(@ARGV));
+        } elsif (substr($arg, 0, 1) eq '-') {
+            push(@unknownOpt, $arg);        # worry about it later...
         } else {
-            $option{converterOption}{$cnvOpt} = 1;
+            $inFileName = $arg;
         }
-    } else {
-        print("\nUnknown option: $_\n");
-        print($help);
-        exit(1);
     }
-}
 
-if ($option{converter} eq 'SL') {
-    # set some options especially for Sensei's Library
-    if(exists($option{movesPerDiagram})) {
-        if ($option{movesPerDiagram} > 10) {
-            print "Warning: Sensei's Library won't accept movesPerDiagram greater than 10\n";
-            print "I'll continue, but the output may not be valid\n";
-        }
-    } else {
-        $option{movesPerDiagram} = 10;
-    }
-    $option{newNumbers} = 1;        # turn on newNumbers
-}
-
-unless(exists($option{movesPerDiagram})) {
-    $option{movesPerDiagram} = scalar(@{$option{breakList}}) ? 10000 : 50
-}
-
-# open the input file handle
-if (not defined($inFileName) or ($inFileName eq '-')) {
-    $inFileName = 'STDIN';
-    $inHandle = \*STDIN;
-} else {
-    if (!-e $inFileName) {
-        if (-e "$inFileName.sgf") {
-            $inFileName = "$inFileName.sgf";
-        } elsif (-e "${inFileName}sgf") {
-            $inFileName = "${inFileName}sgf";
-        } else {
-            if (-e "$inFileName.mgt") {
-                $inFileName = "$inFileName.mgt";
+    foreach (@unknownOpt) {
+        if (m/^-$option{converter}-(.*)/) {
+            my $cnvOpt = $1;
+            if ($cnvOpt =~ m/(\S+)\s+(.*)/) {
+                $option{converterOption}{$1} = $2;
             } else {
-                die("Can't find $inFileName, $inFileName.sgf or $inFileName.mgt\n");
+                $option{converterOption}{$cnvOpt} = 1;
+            }
+        } else {
+            print("\nUnknown option: $_\n");
+            print($help);
+            exit(1);
+        }
+    }
+
+    if ($option{converter} eq 'SL') {
+        # set some options especially for Sensei's Library
+        if(exists($option{movesPerDiagram})) {
+            if ($option{movesPerDiagram} > 10) {
+                print "Warning: Sensei's Library won't accept movesPerDiagram greater than 10\n";
+                print "I'll continue, but the output may not be valid\n";
+            }
+        } else {
+            $option{movesPerDiagram} = 10;
+        }
+        $option{newNumbers} = 1;        # turn on newNumbers
+    }
+
+    unless(exists($option{movesPerDiagram})) {
+        $option{movesPerDiagram} = scalar(@{$option{breakList}}) ? 10000 : 50
+    }
+}
+
+sub run {
+
+    set_defaults();
+    parse_command_line();
+    # open the input file handle
+    if (not defined($inFileName) or ($inFileName eq '-')) {
+        $inFileName = 'STDIN';
+        $inHandle = \*STDIN;
+    } else {
+        if (!-e $inFileName) {
+            if (-e "$inFileName.sgf") {
+                $inFileName = "$inFileName.sgf";
+            } elsif (-e "${inFileName}sgf") {
+                $inFileName = "${inFileName}sgf";
+            } else {
+                if (-e "$inFileName.mgt") {
+                    $inFileName = "$inFileName.mgt";
+                } else {
+                    die("Can't find $inFileName, $inFileName.sgf or $inFileName.mgt\n");
+                }
             }
         }
+        $inHandle = IO::File->new("<$inFileName") or
+            die("Can't open $inFileName for reading: $!\n");
     }
-    $inHandle = IO::File->new("<$inFileName") or
-        die("Can't open $inFileName for reading: $!\n");
-}
 
-# convert the input filename into an output filename
-unless (defined ($outFileName)) {
-    if ($inFileName eq  'STDIN') {
-        $outFileName = 'STDOUT';
-    } else {
-        $outFileName = $inFileName;
-        unless ($outFileName =~ s/.sgf$//i) {
-            $outFileName =~ s/.mgt$//i;
+    # convert the input filename into an output filename
+    unless (defined ($outFileName)) {
+        if ($inFileName eq  'STDIN') {
+            $outFileName = 'STDOUT';
+        } else {
+            $outFileName = $inFileName;
+            unless ($outFileName =~ s/.sgf$//i) {
+                $outFileName =~ s/.mgt$//i;
+            }
         }
+        $outFileName =~ s/.*\///;   # output into current directory
     }
-    $outFileName =~ s/.*\///;   # output into current directory
-}
-# create the root diagram object
-$rootDiagram = $diagram = Games::Go::Diagram->new(callback    => \&finishDiagram,
-                                                  boardSizeX  => $option{boardSizeX},
-                                                  boardSizeY  => $option{boardSizeY},
-                                                  coord_style => $option{coordStyle});
-$diagram->user({first  => 'first',      # init user hash
-                mainId => 1,
-                id     => $diagramId++});   # id isn't really used for anything,
-                                            #   but it helps during debug
+    # create the root diagram object
+    $rootDiagram = $diagram = Games::Go::Sgf2Dg::Diagram->new(
+        callback    => \&finishDiagram,
+        boardSizeX  => $option{boardSizeX},
+        boardSizeY  => $option{boardSizeY},
+        coord_style => $option{coordStyle}
+    );
+    $diagram->user({first  => 'first',      # init user hash
+                    mainId => 1,
+                    id     => $diagramId++});   # id isn't really used for anything,
+                                                #   but it helps during debug
 
-# create the converter object (early so we get errors right away)
-my $fullConvName = "Games::Go::Dg2$option{converter}";
-eval "require $fullConvName;";
-die "Couldn't require $fullConvName: $@" if $@;
+    # create the converter object (early so we get errors right away)
+    my $fullConvName = "Games::Go::Sgf2Dg::Dg2$option{converter}";
+    eval "require $fullConvName;";
+    die "Couldn't require $fullConvName: $@" if $@;
 
-my $converter;
-eval "\$converter = $fullConvName->new(
-        doubleDigits => \$option{doubleDigits},
-        coords       => \$option{coords},
-        \%{\$option{converterOption}});";
+    my $converter;
+    eval "\$converter = $fullConvName->new(
+            doubleDigits => \$option{doubleDigits},
+            coords       => \$option{coords},
+            \%{\$option{converterOption}});";
 
-die "Couldn't create new $fullConvName converter: $@" if $@;
+    die "Couldn't create new $fullConvName converter: $@" if $@;
 
-# parse the SGF into the diagrams
-printIndent("Parsing Diagram 1 at move $moveNum\n");
-SGF_ReadFile($inHandle);
-close($inHandle);                       # don't need this anymore
+    # parse the SGF into the diagrams
+    printIndent("Parsing Diagram 1 at move $moveNum\n");
+    SGF_ReadFile($inHandle);
+    close($inHandle);                       # don't need this anymore
 
-$converter->configure(
-        boardSizeX   => $option{boardSizeX},
-        boardSizeY   => $option{boardSizeY},
-        %{$option{converterOption}}
-        );
-# handle the output file
-if (($outFileName eq 'STDOUT') or ($outFileName eq '-')) {
-    $converter->configure(file => \*STDOUT);
-    $converter->configure(filename => 'STDOUT');
-} else {
-    my $outSuffix = lc $option{converter};
-    unless ($outFileName =~ m/.$outSuffix$/i) {
-        $outFileName .= ".$outSuffix";  # tack on the converter extension
+    $converter->configure(
+            boardSizeX   => $option{boardSizeX},
+            boardSizeY   => $option{boardSizeY},
+            %{$option{converterOption}}
+            );
+    # handle the output file
+    if (($outFileName eq 'STDOUT') or ($outFileName eq '-')) {
+        $converter->configure(file => \*STDOUT);
+        $converter->configure(filename => 'STDOUT');
+    } else {
+        my $outSuffix = lc $option{converter};
+        unless ($outFileName =~ m/.$outSuffix$/i) {
+            $outFileName .= ".$outSuffix";  # tack on the converter extension
+        }
+        $converter->configure(file => ">$outFileName");
     }
-    $converter->configure(file => ">$outFileName");
+
+    # add an attribution comment
+    $converter->comment(
+    "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    This file was created by $myName $VERSION with the following command line:
+
+    $commandLine
+
+    $myName was created by Reid Augustin.  The go fonts, TeX
+    macros and TeX programming were designed by Daniel Bump.
+
+    More information about the $myName package can be found at:
+
+                http://match.stanford.edu/bump/go.html
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    ");
+
+    # now print the diagrams
+    convertDiagram($converter, $rootDiagram, 0);
+
+    $converter->close;
 }
-
-# add an attribution comment
-$converter->comment(
-"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
- This file was created by $myName $version with the following command line:
-
- $commandLine
-
- $myName was created by Reid Augustin.  The go fonts, TeX
- macros and TeX programming were designed by Daniel Bump.
-
- More information about the $myName package can be found at:
-
-               http://match.stanford.edu/bump/go.html
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-");
-
-# now print the diagrams
-convertDiagram($converter, $rootDiagram, 0);
-
-$converter->close;
-
-exit(0);
 
 # The auto_bounds method is borrowed (stolen?) from Marcel Gruenauer's 
 #    Dg2SL converter for Sensei's Library (with slight modifications).
@@ -1659,11 +1685,13 @@ sub auto_bounds {
                     bottomLine => $bottom);
 }
 
+1;
+
 __END__
 
 =head1 SEE ALSO
 
-=over 0
+=over
 
 =item o sgfsplit(1)   - splits a .sgf file into its component variations
 
@@ -1676,24 +1704,8 @@ sgf2dg was written by Reid Augustin, E<lt>reid@hellosix.comE<gt>
 The GOOE fonts and TeX macros were designed by Daniel Bump
 (bump@math.stanford.edu).  Daniel hosts the GOOE and sgf2dg home page at:
 
-    L<http://match.stanford.edu/bump/go.html>
+=over 4
 
-=head1 COPYRIGHT AND LICENSE
+L<http://match.stanford.edu/bump/go.html>
 
-Copyright (C) 1997-2005 by Reid Augustin
-
-This program is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation; either version 2 of the License, or (at your option) any later
-version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
-details.
-
-You should have received a copy of the GNU General Public License along with
-this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-Place - Suite 330, Boston, MA 02111, USA
-
-=cut
+=back

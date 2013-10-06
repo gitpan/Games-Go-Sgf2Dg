@@ -1,39 +1,31 @@
-# $Id: Diagram.pm 200 2007-06-11 00:38:00Z reid $
-
-#   Diagram
+#===============================================================================
+#
+#         FILE:  Diagram
+#
+#     ABSTRACT:  Encapsulate a go diagram
+#
+#       AUTHOR:  Reid Augustin (REID), <reid@hellosix.com>
+#===============================================================================
 #
 #   Copyright (C) 2005 Reid Augustin reid@netchip.com
 #                      1000 San Mateo Dr.
 #                      Menlo Park, CA 94025 USA
 #
-#   This library is free software; you can redistribute it and/or modify it
-#   under the same terms as Perl itself, either Perl version 5.8.5 or, at your
-#   option, any later version of Perl 5 you may have available.
-#
-#   This program is distributed in the hope that it will be useful, but
-#   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-#   or FITNESS FOR A PARTICULAR PURPOSE.
-#
-
-=head1 NAME
-
-Games::Go::Diagram - Perl extension to make go diagrams similar to printed diagrams
 
 =head1 SYNOPSIS
 
- use Games::Go::Diagram
+ use Games::Go::Sgf2Dg::Diagram
 
- my $diagram = Games::Go::Diagram->new (options);
+ my $diagram = Games::Go::Sgf2Dg::Diagram->new (options);
  $diagram->put($coords, 'white' | 'black', ? number ?);
  $diagram->mark($coords);
  $diagram->label($coords, 'a');
  $diagram->get($coords);
  my $new_diagram = $diagram->next;
 
-
 =head1 DESCRIPTION
 
-A Games::Go::Diagram object represents a diagram similar to those
+A Games::Go::Sgf2Dg::Diagram object represents a diagram similar to those
 seen in go textbooks and magazines.  Most of the properties defined in SGF
 FF[4] are supported.
 
@@ -69,8 +61,10 @@ example:
 use strict;
 require 5.001;
 
-package Games::Go::Diagram;
+package Games::Go::Sgf2Dg::Diagram;
 use Carp;
+
+our $VERSION = '4.249'; # VERSION
 
 our @ISA = qw(Exporter);
 
@@ -88,10 +82,6 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
 );
-
-BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 200 $' =~ /(\d+)/;
-}
 
 # Constants
 use constant DEFAULT_MARK => 'TR';      # TRiangle mark property
@@ -122,17 +112,17 @@ our %options = (hoshi             => [],
 #
 #####################################################
 
-=head1 METHODS
+=head1 NEW
 
 =over 4
 
-=item my $diagram = Games::Go::Diagram-E<gt>B<new> (?options?)
+=item my $diagram = Games::Go::Sgf2Dg::Diagram-E<gt>B<new> (?options?)
 
-A B<new> Games::Go::Diagram can take the following options:
+=back
 
-Options:
+A B<new> Games::Go::Sgf2Dg::Diagram can take the following options:
 
-=over 4
+=over 8
 
 =item B<hoshi> =E<gt> ['coords', ...]
 
@@ -152,7 +142,7 @@ with white stones already in place.
 =item B<coord_style> =E<gt> 'normal' | 'sgf' | numeric
 
 Defines the coordinate translation system.  Note that while
-B<Games::Go::Diagram> doesn't use this coordinate system directly, sgf2dg
+B<Games::Go::Sgf2Dg::Diagram> doesn't use this coordinate system directly, sgf2dg
 converters may call the coordinate translator methods B<xcoord> and
 B<ycoord>, which rely on B<coord_style> and B<boardSizeX/Y> (below).
 
@@ -248,6 +238,10 @@ sub new {
     $my->{provisional} = 1;     # make all actions provisional
     return($my);
 }
+
+=head1 METHODS
+
+=over 4
 
 =item $diagram-E<gt>B<clear>
 
@@ -405,7 +399,7 @@ sub next {
                  ($key eq 'node'));
         $o{$key} = $my->{$key}; # watch out for reference copies!
     }
-    my $next = Games::Go::Diagram->new(
+    my $next = Games::Go::Sgf2Dg::Diagram->new(
         hoshi    => \@hoshi,
         white    => \@white,
         black    => \@black,
@@ -1614,25 +1608,10 @@ Script to convert SGF format files to Go diagrams
 
 =back
 
-
 =head1 BUGS
 
 With the current architecture, conflicts within a node are not
 detected.  I think this would probably be malformed SGF.  This
 deficiency could be fixed by adding a 'shadow' diagram to which
 provisional actions are applied.
-
-=head1 AUTHOR
-
-Reid Augustin, E<lt>reid@netchip.comE<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2005 by Reid Augustin
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.8.5 or,
-at your option, any later version of Perl 5 you may have available.
-
-=cut
 

@@ -1,34 +1,27 @@
-# $Id: Dg2TeX.pm 213 2008-02-25 08:19:31Z reid $
-
-#   Dg2TeX
+#===============================================================================
+#
+#         FILE:  Dg2TeX
+#
+#     ABSTRACT:  convert Games::Go::Sgf2Dg::Diagrams to TeX
+#
+#       AUTHOR:  Reid Augustin (REID), <reid@hellosix.com>
+#===============================================================================
 #
 #   Copyright (C) 2005 Reid Augustin reid@hellosix.com
 #                      1000 San Mateo Dr.
 #                      Menlo Park, CA 94025 USA
 #
-#   This library is free software; you can redistribute it and/or modify it
-#   under the same terms as Perl itself, either Perl version 5.8.5 or, at your
-#   option, any later version of Perl 5 you may have available.
-#
-#   This program is distributed in the hope that it will be useful, but
-#   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-#   or FITNESS FOR A PARTICULAR PURPOSE.
-#
-
-=head1 NAME
-
-Games::Go::Dg2TeX - Perl extension to convert Games::Go::Diagrams to TeX
 
 =head1 SYNOPSIS
 
-use Games::Go::Dg2TeX
+use Games::Go::Sgf2Dg::Dg2TeX
 
- my $dg2tex = B<Games::Go::Dg2TeX-E<gt>new> (options);
+ my $dg2tex = B<Games::Go::Sgf2Dg::Dg2TeX-E<gt>new> (options);
  my $tex = $dg2tex->convertDiagram($diagram);
 
 =head1 DESCRIPTION
 
-A Games::Go::Dg2TeX object converts a L<Games::Go::Diagram> object
+A Games::Go::Sgf2Dg::Dg2TeX object converts a L<Games::Go::Sgf2Dg::Diagram> object
 into TeX source code which can be used stand-alone, or it can be
 incorporated into larger TeX documents.
 
@@ -37,8 +30,10 @@ incorporated into larger TeX documents.
 use strict;
 require 5.001;
 
-package Games::Go::Dg2TeX;
+package Games::Go::Sgf2Dg::Dg2TeX;
 use Carp;
+
+our $VERSION = '4.249'; # VERSION
 
 our @ISA = qw(Exporter);
 
@@ -56,10 +51,6 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
 );
-
-BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 213 $' =~ /(\d+)/;
-}
 
 ######################################################
 #
@@ -240,19 +231,20 @@ our %options = (
 #
 #####################################################
 
-=head1 METHODS
+=head1 NEW
 
 =over 4
 
-=item my $dg2tex = B<Games::Go::Dg2TeX-E<gt>new> (?options?)
+=item my $dg2tex = B<Games::Go::Sgf2Dg::Dg2TeX-E<gt>new> (?options?)
+
+=back
 
 A B<new> Games::Go::D2TeX takes the following options:
 
-=head2 General Dg2 Converter Options:
-
-=over 4
+=over 8
 
 =item B<boardSizeX> =E<gt> number
+
 =item B<boardSizeY> =E<gt> number
 
 Sets the size of the board.
@@ -279,11 +271,11 @@ The edges of the board that should be displayed.  Any portion of the
 board that extends beyond these numbers is not included in the
 output.
 
-=item B<diaCoords> =E<gt> sub { # convert $x, $y to Games::Go::Diagram
+=item B<diaCoords> =E<gt> sub { # convert $x, $y to Games::Go::Sgf2Dg::Diagram
 coordinates }
 
 This callback defines a subroutine to convert coordinates from $x,
-$y to whatever coordinates are used in the Games::Go::Diagram
+$y to whatever coordinates are used in the Games::Go::Sgf2Dg::Diagram
 object.  The default B<diaCoords> converts 1-based $x, $y to the
 same coordinates used in SGF format files.  You only need to define
 this if you're using a different coordinate system in the Diagram.
@@ -335,9 +327,7 @@ part of the TeX diagram source.
 
 =back
 
-=head2 Dg2TeX-specific options
-
-=over 4
+=over 8
 
 =item B<simple> =E<gt> true | false
 
@@ -426,6 +416,10 @@ sub new {
     return($my);
 }
 
+=head1 METHODS
+
+=over 4
+
 =item $dg2tex-E<gt>B<configure> (option =E<gt> value, ?...?)
 
 Change Dg2TeX options from values passed at B<new> time.
@@ -503,7 +497,8 @@ sub print {
     my ($my, @args) = @_;
 
     # one-time init:
-    unless(exists($my->{macrosDone})) {
+    unless(exists($my->{macrosDone}) and
+           ($my->{macrosDone} eq 1)) {
         $my->{macrosDone} = 1;
         $my->print("\\magnification=$my->{mag}\n");
         $my->print(COMMON_MACROS);
@@ -557,7 +552,7 @@ sub comment {
 
 =item my $tex_source = $dg2tex-E<gt>B<convertDiagram> ($diagram)
 
-Converts a I<Games::Go::Diagram> into TeX.  If B<file> was defined
+Converts a I<Games::Go::Sgf2Dg::Diagram> into TeX.  If B<file> was defined
 in the B<new> method, the TeX source is dumped into the B<file>.
 In any case, the TeX source is returned as a string scalar.
 
@@ -1079,7 +1074,7 @@ __END__
 
 =head1 SEE ALSO
 
-=over 0
+=over
 
 =item L<sgf2dg>(1)
 
@@ -1090,18 +1085,4 @@ Script to convert SGF format files to Go diagrams
 =head1 BUGS
 
 Nah.  At least, I don't think so.  Well, I hope not.
-
-=head1 AUTHOR
-
-Reid Augustin, E<lt>reid@hellosix.comE<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2005 by Reid Augustin
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.8.5 or,
-at your option, any later version of Perl 5 you may have available.
-
-=cut
 

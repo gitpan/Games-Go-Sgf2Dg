@@ -10,13 +10,13 @@ use IO::File;
 use Test::More;
 eval { require PostScript::File };
 if ($@) {
-    plan(skip_all => "postScript::File not installed: $@");
+    plan(skip_all => "PostScript::File not installed: $@");
 }
 
 plan (tests => 8);
 
-use_ok('Games::Go::Dg2Ps');
-use_ok('Games::Go::Diagram');
+use_ok('Games::Go::Sgf2Dg::Dg2Ps');
+use_ok('Games::Go::Sgf2Dg::Diagram');
 
 
 #########################
@@ -25,7 +25,7 @@ use_ok('Games::Go::Diagram');
 # its man page ( perldoc Test::More ) for help writing this test script.
 
 my $diagram;
-eval { $diagram = Games::Go::Diagram->new(
+eval { $diagram = Games::Go::Sgf2Dg::Diagram->new(
                     hoshi             => ['ba', 'cd'],
                     black             => ['ab'],
                     white             => ['dd', 'cd'],
@@ -39,11 +39,11 @@ my $dg2ps;
 ##
 ## create dg2ps object:
 ##
-eval { $dg2ps = Games::Go::Dg2Ps->new(
+eval { $dg2ps = Games::Go::Sgf2Dg::Dg2Ps->new(
         coords       => 1,
         file         => '>test.ps'); };
 is( $@, '',                                     'new Dg2Ps object'  );
-isa_ok( $dg2ps, 'Games::Go::Dg2Ps',           '   dg2ps is the right class'  );
+isa_ok( $dg2ps, 'Games::Go::Sgf2Dg::Dg2Ps',           '   dg2ps is the right class'  );
 
 $dg2ps->configure(boardSizeX => 5, boardSizeY => 5);
 $dg2ps->convertDiagram($diagram);

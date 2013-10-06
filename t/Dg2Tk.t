@@ -21,8 +21,8 @@ if ($@) {
 
 plan (tests => 6);
 
-use_ok('Games::Go::Dg2Tk');
-use_ok('Games::Go::Diagram');
+use_ok('Games::Go::Sgf2Dg::Dg2Tk');
+use_ok('Games::Go::Sgf2Dg::Diagram');
 
 
 #########################
@@ -31,7 +31,7 @@ use_ok('Games::Go::Diagram');
 # its man page ( perldoc Test::More ) for help writing this test script.
 
 my $diagram;
-eval { $diagram = Games::Go::Diagram->new(
+eval { $diagram = Games::Go::Sgf2Dg::Diagram->new(
                     hoshi             => ['ba', 'cd'],
                     black             => ['ab'],
                     white             => ['dd', 'cd'],
@@ -46,13 +46,13 @@ my $dg2tk;
 ## create dg2tk object:
 ##
 SKIP: {
-    eval { $dg2tk = Games::Go::Dg2Tk->new(
+    eval { $dg2tk = Games::Go::Sgf2Dg::Dg2Tk->new(
             doubleDigits => 0,
             coords       => 1, ); };
     skip ("$@ (no X server?)", 4) if ($@ =~ m/couldn't connect to display/);
 
     is( $@, '',                                     'new Dg2Tk object'  );
-    isa_ok( $dg2tk, 'Games::Go::Dg2Tk',             '   dg2tk is the right class'  );
+    isa_ok( $dg2tk, 'Games::Go::Sgf2Dg::Dg2Tk',             '   dg2tk is the right class'  );
 
     $dg2tk->configure(boardSizeX => 5, 
                       boardSizeY => 5,

@@ -45,6 +45,12 @@ happens, it will stop and ask for user input (our apologies to
 automatic testers and installers).  If you don't wish to install the
 TeX parts, you may answer with 'q' at this time.
 
+Completing font installation in TeX may require tools that are not included
+in a standard TeX installation.  If displaying your output document fails
+with "font not found" messages, you may need to install some additional TeX
+'utils' package.  Examine the error messages for 'command not found' for
+more clues (mktexpk may be the culprit).
+
 Installation includes a number of manual/perldoc pages.  Invoking:
 
     $ perldoc sgf2dg
@@ -60,11 +66,11 @@ In addition, there are pages for all the output converters.  Since
 the converters are stored in the Games::Go hierarchy of your perl
 installation, you can view their perldoc/man pages with:
 
-    $ perldoc Games::Go::Dg2Tk
+    $ perldoc Games::Go::Sgf2Dg::Dg2Tk
 
 or
 
-    $ man Games::Go::Dg2PDF
+    $ man Games::Go::Sgf2Dg::Dg2PDF
 
 There is also a manual.tex included with this distribution.  If you
 install using the invocation above, it produces a manual.dvi file in

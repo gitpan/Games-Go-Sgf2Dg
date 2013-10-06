@@ -1,14 +1,13 @@
-# $Id: Makefile 191 2007-06-02 15:31:50Z reid $
 #
-#       Makefile for sgf2tex/tex subdirectory.  This Makefile installs the TeX
-#       portions of the sgf2tex distribution: the GOOE fonts, font metrics,
+#       Makefile for sgf2dg/tex subdirectory.  This Makefile installs the TeX
+#       portions of the sgf2dg distribution: the GOOE fonts, font metrics,
 #       and TeX include files.
 #
 
 
-# During 'perl Makefile.PL' in the parent (sgf2tex) directory, the section
-# below between the '# perl Makefile.PL auto-edit' and '# perl Makefile.PL
-# auto-edit end' comments is completely deleted and rebuilt.
+# During 'perl Makefile.PL' in the parent (sgf2dg) directory, the section
+# below between the 'start perl Makefile.PL auto-edit' and 'end perl Makefile.PL
+# auto-edit' comments is completely deleted and rebuilt.
 #
 # You can override the variables by either changing the values 'perl
 # Makefile.PL' put in the auto-edit section (temporary - overwritten the next
@@ -81,21 +80,32 @@ all:
 # (with the '-' in front so make doesn't choke if the command isn't there)
 install:
 	rm -f $(PKFONTS)
-	- mkdir $(MFDIR)
+	- $(MKDIR) $(MFDIR)
 	$(INSTALL) *.mf $(MFDIR)
-	- mkdir $(TFMDIR)
+	- $(MKDIR) $(TFMDIR)
 	$(INSTALL) *.tfm $(TFMDIR)
 	$(INSTALL) gooemacs.tex gotcmacs.tex $(TEXINPUTS)
 	- texhash
 	- MakeTeXls-R
 
+# clean installed fonts
+clean:
+	- $(RM) $(TEXINPUTS)/gooemacs.tex $(TEXINPUTS)/gotcmacs.tex
+	- $(RM) $(TFMDIR)/*.tfm
+	- $(RMDIR) $(TFMDIR)
+	- $(RM) $(MFDIR)/*.mf
+	- $(RMDIR) $(MFDIR)
+	- $(RM_F) $(PKFONTS)
+	- texhash
+	- MakeTeXls-R
+
 # The preferred method of installation is just to copy the metafont sources
-# and tfm files into appropriated directories in MakeTeXPK's search path. The
-# required pk fonts will be then built automatically by the system. In an
-# emergency, you can build the fonts by hand with `make -f Makefile.tex
-# fonts'. This might be appropriate if (for example) you are working on a
-# machine where you do not have superuser privileges, or if you are working on
-# a DOS port.
+# and tfm files into appropriated directories in MakeTeXPK's search path.
+# The required pk fonts will be then built automatically by the system. In
+# an emergency, you can build the fonts by hand with `make -f fonts'.  This
+# might be appropriate if (for example) you are working on a machine where
+# you do not have superuser privileges, or if you are working on a DOS
+# port.
 
 fonts: $(FONTS)
 

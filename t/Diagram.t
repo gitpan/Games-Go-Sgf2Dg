@@ -10,7 +10,7 @@ use IO::File;
 use Test::More tests => 28;
 
 BEGIN {
-    use_ok('Games::Go::Diagram')
+    use_ok('Games::Go::Sgf2Dg::Diagram')
 };
 
 #########################
@@ -27,7 +27,7 @@ sub conflictCallback {
 ##
 ## create diagram object:
 ##
-eval { $diagram = Games::Go::Diagram->new(
+eval { $diagram = Games::Go::Sgf2Dg::Diagram->new(
                     hoshi             => ['ba', 'cd'],
                     black             => ['ab'],
                     white             => ['dd', 'cd'],
@@ -35,7 +35,7 @@ eval { $diagram = Games::Go::Diagram->new(
                     enable_overstones => 1,
                     overstone_eq_mark => 1); };
 is( $@, '',                                     'new Diagram object'  );
-isa_ok( $diagram, 'Games::Go::Diagram',         '   diagram is the right class'  );
+isa_ok( $diagram, 'Games::Go::Sgf2Dg::Diagram',         '   diagram is the right class'  );
 
 is_deeply( $diagram->get('aa'), {
 },                                              'initial get(aa)' );

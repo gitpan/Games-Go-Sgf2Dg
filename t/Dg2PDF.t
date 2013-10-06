@@ -15,8 +15,8 @@ if ($@) {
 
 plan (tests => 6);
 
-use_ok('Games::Go::Dg2PDF');
-use_ok('Games::Go::Diagram');
+use_ok('Games::Go::Sgf2Dg::Dg2PDF');
+use_ok('Games::Go::Sgf2Dg::Diagram');
 
 
 #########################
@@ -25,7 +25,7 @@ use_ok('Games::Go::Diagram');
 # its man page ( perldoc Test::More ) for help writing this test script.
 
 my $diagram;
-eval { $diagram = Games::Go::Diagram->new(
+eval { $diagram = Games::Go::Sgf2Dg::Diagram->new(
                     hoshi             => ['ba', 'cd'],
                     black             => ['ab'],
                     white             => ['dd', 'cd'],
@@ -39,12 +39,12 @@ my $dg2pdf;
 ##
 ## create dg2pdf object:
 ##
-eval { $dg2pdf = Games::Go::Dg2PDF->new(
+eval { $dg2pdf = Games::Go::Sgf2Dg::Dg2PDF->new(
         doubleDigits => 0,
         coords       => 1,
         file         => '>test.pdf'); };
 is( $@, '',                                     'new Dg2PDF object'  );
-isa_ok( $dg2pdf, 'Games::Go::Dg2PDF',           '   dg2pdf is the right class'  );
+isa_ok( $dg2pdf, 'Games::Go::Sgf2Dg::Dg2PDF',           '   dg2pdf is the right class'  );
 
 $dg2pdf->configure(boardSizeX => 5, boardSizeY => 5);
 $dg2pdf->convertDiagram($diagram);

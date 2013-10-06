@@ -10,8 +10,8 @@ use IO::File;
 use Test::More tests => 16;
 
 BEGIN {
-    use_ok('Games::Go::Dg2ASCII');
-    use_ok('Games::Go::Diagram');
+    use_ok('Games::Go::Sgf2Dg::Dg2ASCII');
+    use_ok('Games::Go::Sgf2Dg::Diagram');
 };
 
 #########################
@@ -25,12 +25,12 @@ my $dg2ascii;
 ## create dg2ascii object:
 ##
 my ($text1, $text);        # collect text here
-eval { $dg2ascii = Games::Go::Dg2ASCII->new(
+eval { $dg2ascii = Games::Go::Sgf2Dg::Dg2ASCII->new(
         doubleDigits => 0,
         coords       => 1,
         file         => \$text1); };
 is( $@, '',                                     'new Dg2ASCII object'  );
-isa_ok( $dg2ascii, 'Games::Go::Dg2ASCII',       '   dg2ascii is the right class'  );
+isa_ok( $dg2ascii, 'Games::Go::Sgf2Dg::Dg2ASCII',       '   dg2ascii is the right class'  );
 
 eval {$dg2ascii->comment(' comment')};
 is( $@, '',                                     'added comment' );
@@ -52,7 +52,7 @@ raw print
 is( $dg2ascii->converted(''), '',               'converted text cleared' );
 
 my $diagram;
-eval { $diagram = Games::Go::Diagram->new(
+eval { $diagram = Games::Go::Sgf2Dg::Diagram->new(
                     hoshi             => ['ba', 'cd'],
                     black             => ['ab'],
                     white             => ['dd', 'cd'],

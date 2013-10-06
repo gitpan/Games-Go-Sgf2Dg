@@ -1,35 +1,27 @@
-# $Id: Dg2PDF.pm 171 2007-04-14 04:31:46Z reid $
-
-#   Dg2PDF
+#===============================================================================
+#
+#         FILE:  Dg2PDF
+#
+#     ABSTRACT:  convert Games::Go::Sgf2Dg::Diagrams to PDF (Portable Document Format)
+#
+#       AUTHOR:  Reid Augustin (REID), <reid@hellosix.com>
+#===============================================================================
 #
 #   Copyright (C) 2005 Reid Augustin reid@hellosix.com
 #                      1000 San Mateo Dr.
 #                      Menlo Park, CA 94025 USA
 #
-#   This library is free software; you can redistribute it and/or modify it
-#   under the same terms as Perl itself, either Perl version 5.8.5 or, at your
-#   option, any later version of Perl 5 you may have available.
-#
-#   This program is distributed in the hope that it will be useful, but
-#   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-#   or FITNESS FOR A PARTICULAR PURPOSE.
-#
-
-=head1 NAME
-
-Games::Go::Dg2PDF - Perl extension to convert L<Games::Go::Diagrams> to
-PDF (Portable Document Format).
 
 =head1 SYNOPSIS
 
-use Games::Go::Dg2PDF
+use Games::Go::Sgf2Dg::Dg2PDF
 
- my $dg2pdf = B<Games::Go::Dg2PDF-E<gt>new> (options);
+ my $dg2pdf = B<Games::Go::Sgf2Dg::Dg2PDF-E<gt>new> (options);
  $dg2pdf->convertDiagram($diagram);
 
 =head1 DESCRIPTION
 
-A Games::Go::Dg2PDF object converts a L<Games::Go::Diagram> object
+A Games::Go::Sgf2Dg::Dg2PDF object converts a L<Games::Go::Sgf2Dg::Diagram> object
 into a PDF file.
 
 =cut
@@ -37,7 +29,9 @@ into a PDF file.
 use strict;
 require 5.001;
 
-package Games::Go::Dg2PDF;
+package Games::Go::Sgf2Dg::Dg2PDF;
+
+our $VERSION = '4.249'; # VERSION
 
 eval { require PDF::Create; };   # is this module available?
 if ($@) {
@@ -65,10 +59,6 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
 );
-
-BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 171 $' =~ /(\d+)/;
-}
 
 {
     my $v = ($PDF::Create::VERSION =~ m/(^\d*\.\d*)/)[0];
@@ -237,19 +227,20 @@ use constant MARK_PEN       => NORMAL_PEN * 3;
 #
 #####################################################
 
-=head1 METHODS
+=head1 NEW
 
 =over 4
 
-=item my $dg2pdf = B<Games::Go::Dg2PDF-E<gt>new> (?options?)
+=item my $dg2pdf = B<Games::Go::Sgf2Dg::Dg2PDF-E<gt>new> (?options?)
 
-A B<new> Games::Go::Dg2PDF takes the following options:
+=back
 
-=head2 General Dg2 Converter Options:
+A B<new> Games::Go::Sgf2Dg::Dg2PDF takes the following options:
 
-=over 4
+=over 8
 
 =item B<boardSizeX> =E<gt> number
+
 =item B<boardSizeY> =E<gt> number
 
 Sets the size of the board.
@@ -285,7 +276,7 @@ output.
 =item B<diaCoords> =E<gt> sub { # convert $x, $y to Diagram coordinates }
 
 This callback defines a subroutine to convert coordinates from $x,
-$y to whatever coordinates are used in the Games::Go::Diagram
+$y to whatever coordinates are used in the Games::Go::Sgf2Dg::Diagram
 object.  The default B<diaCoords> converts 1-based $x, $y to the
 same coordinates used in SGF format files.  You only need to define
 this if you're using a different coordinate system in the Diagram.
@@ -305,33 +296,27 @@ This callback is called from the B<print> method (below) with the
 reference to the B<Dg2TeX> object and a list of lines that are
 part of the TeX diagram source.
 
-=back
-
-=head2 Dg2PDF-specific options:
-
-=over 4
-
 =item B<pageSize> =E<gt> 'page size'
 
 May be one of:
 
-=over 4
+=over 12
 
-=item a0 - a6
+=item . a0 - a6
 
-=item letter
+=item . letter
 
-=item broadsheet
+=item . broadsheet
 
-=item ledger
+=item . ledger
 
-=item tabloid
+=item . tabloid
 
-=item legal
+=item . legal
 
-=item executive
+=item . executive
 
-=item 36x36
+=item . 36x36
 
 =back
 
@@ -356,31 +341,31 @@ Default for all margins: 72 * .70 (7/10s of an inch)
 
 Text and stone fonts names may be one of these (case sensitive):
 
-=over 4
+=over 12
 
-=item Courier
+=item . Courier
 
-=item Courier-Bold
+=item . Courier-Bold
 
-=item Courier-BoldOblique
+=item . Courier-BoldOblique
 
-=item Courier-Oblique
+=item . Courier-Oblique
 
-=item Helvetica
+=item . Helvetica
 
-=item Helvetica-Bold
+=item . Helvetica-Bold
 
-=item Helvetica-BoldOblique
+=item . Helvetica-BoldOblique
 
-=item Helvetica-Oblique
+=item . Helvetica-Oblique
 
-=item Times-Roman
+=item . Times-Roman
 
-=item Times-Bold
+=item . Times-Bold
 
-=item Times-Italic
+=item . Times-Italic
 
-=item Times-BoldItalic
+=item . Times-BoldItalic
 
 =back
 
@@ -440,6 +425,10 @@ sub new {
     $my->configure(%args);
     return($my);
 }
+
+=head1 METHODS
+
+=over 4
 
 =item $dg2pdf-E<gt>B<configure> (option =E<gt> value, ?...?)
 
@@ -562,7 +551,7 @@ sub comment {
 
 =item my $canvas = $dg2pdf-E<gt>B<convertDiagram> ($diagram)
 
-Converts a I<Games::Go::Diagram> into PDF.
+Converts a I<Games::Go::Sgf2Dg::Diagram> into PDF.
 
 =cut
 
@@ -739,43 +728,43 @@ recognized:
 
 =over 4
 
-=item GN GameName
+=item . GN GameName
 
-=item EV EVent
+=item . EV EVent
 
-=item RO ROund
+=item . RO ROund
 
-=item DT DaTe
+=item . DT DaTe
 
-=item PW PlayerWhite
+=item . PW PlayerWhite
 
-=item WR WhiteRank
+=item . WR WhiteRank
 
-=item PB PlayerBlack
+=item . PB PlayerBlack
 
-=item BR BlackRank
+=item . BR BlackRank
 
-=item PC PlaCe
+=item . PC PlaCe
 
-=item KM KoMi
+=item . KM KoMi
 
-=item RU RUles
+=item . RU RUles
 
-=item TM TiMe
+=item . TM TiMe
 
-=item OT OverTime (byo-yomi)
+=item . OT OverTime (byo-yomi)
 
-=item RE REsult
+=item . RE REsult
 
-=item AN ANnotator
+=item . AN ANnotator
 
-=item SO Source
+=item . SO Source
 
-=item US USer (entered by)
+=item . US USer (entered by)
 
-=item CP CoPyright
+=item . CP CoPyright
 
-=item GC GameComment
+=item . GC GameComment
 
 =back
 
@@ -1668,7 +1657,7 @@ __END__
 
 =head1 SEE ALSO
 
-=over 0
+=over
 
 =item L<sgf2dg>(1)
 
@@ -1679,18 +1668,4 @@ Script to convert SGF format files to Go diagrams
 =head1 BUGS
 
 You think I'd admit it?
-
-=head1 AUTHOR
-
-Reid Augustin, E<lt>reid@hellosix.comE<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2005 by Reid Augustin
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.8.5 or,
-at your option, any later version of Perl 5 you may have available.
-
-=cut
 

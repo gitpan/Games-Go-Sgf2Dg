@@ -1,36 +1,33 @@
-# $Id: Dg2Mp.pm 213 2008-02-25 08:19:31Z reid $
-
-#   Dg2Mp
+#===============================================================================
+#
+#         FILE:  Dg2Mp
+#
+#     ABSTRACT:  convert Games::Go::Sgf2Dg::Diagrams to John Hobby's MetaPost (which is adapted from Donald Knuth's Metafont).
+#
+#       AUTHOR:  Reid Augustin (REID), <reid@hellosix.com>
+#===============================================================================
 #
 #   Copyright (C) 2005 Reid Augustin reid@hellosix.com
 #                      1000 San Mateo Dr.
 #                      Menlo Park, CA 94025 USA
 #
-#   This library is free software; you can redistribute it and/or modify it
-#   under the same terms as Perl itself, either Perl version 5.8.5 or, at your
-#   option, any later version of Perl 5 you may have available.
-#
-#   This program is distributed in the hope that it will be useful, but
-#   WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-#   or FITNESS FOR A PARTICULAR PURPOSE.
-#
 
 =head1 NAME
 
-Games::Go::Dg2Mp - Perl extension to convert Games::Go::Diagrams to
+Games::Go::Sgf2Dg::Dg2Mp - Perl extension to convert Games::Go::Sgf2Dg::Diagrams to
 John Hobby's MetaPost (which is adapted from Donald Knuth's
 Metafont).
 
 =head1 SYNOPSIS
 
-use Games::Go::Dg2Mp
+use Games::Go::Sgf2Dg::Dg2Mp
 
- my $dg2mp = B<Games::Go::Dg2Mp-E<gt>new> (options);
+ my $dg2mp = B<Games::Go::Sgf2Dg::Dg2Mp-E<gt>new> (options);
  $dg2mp->convertDiagram($diagram);
 
 =head1 DESCRIPTION
 
-A Games::Go::Dg2Mp object converts a L<Games::Go::Diagram> object
+A Games::Go::Sgf2Dg::Dg2Mp object converts a L<Games::Go::Sgf2Dg::Diagram> object
 into a TeX (.tex) and a MetaPost (.mp) file.  The MetaPost file
 contains figures for each of the diagrams and overstones required to
 make the complete game diagram.  Running MetaPost (mpost or possibly
@@ -49,8 +46,10 @@ overall MetaPost system and environment.
 use strict;
 require 5.001;
 
-package Games::Go::Dg2Mp;
+package Games::Go::Sgf2Dg::Dg2Mp;
 use Carp;
+
+our $VERSION = '4.249'; # VERSION
 
 our @ISA = qw(Exporter);
 
@@ -68,10 +67,6 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
 );
-
-BEGIN {
-    our $VERSION = sprintf "1.%03d", '$Revision: 213 $' =~ /(\d+)/;
-}
 
 use constant BLACK          => 'black';
 use constant WHITE          => 'white';
@@ -200,8 +195,8 @@ def _board (expr b_left, b_top, b_right, b_bottom) =
     % place an illusory stone in upper left so the figures
     %   line up after stones are on the edges
     undraw fullcircle xscaled (stone_width) yscaled(stone_height) shifted boardXY(b_left, b_top);
-    for m = b_top upto b_bottom:
-        for n = b_left upto b_right:
+    for n = b_top upto b_bottom:
+        for m = b_left upto b_right:
             _int(m, n);     % draw the intersections
         endfor;
     endfor;
@@ -279,19 +274,20 @@ use constant TWO_COLUMN_MACROS =>
 #
 #####################################################
 
-=head1 METHODS
+=head1 NEW
 
 =over 4
 
-=item my $dg2mp = B<Games::Go::Dg2Mp-E<gt>new> (?options?)
+=item my $dg2mp = B<Games::Go::Sgf2Dg::Dg2Mp-E<gt>new> (?options?)
 
-A B<new> Games::Go::Dg2Mp takes the following options:
+A B<new> Games::Go::Sgf2Dg::Dg2Mp takes the following options:
 
-=head2 General Dg2 Converter Options:
+=back
 
-=over 4
+=over 8
 
 =item B<boardSizeX> =E<gt> number
+
 =item B<boardSizeY> =E<gt> number
 
 Sets the size of the board.
@@ -346,7 +342,7 @@ output.
 =item B<diaCoords> =E<gt> sub { # convert $x, $y to Diagram coordinates }
 
 This callback defines a subroutine to convert coordinates from $x,
-$y to whatever coordinates are used in the Games::Go::Diagram
+$y to whatever coordinates are used in the Games::Go::Sgf2Dg::Diagram
 object.  The default B<diaCoords> converts 1-based $x, $y to the
 same coordinates used in SGF format files.  You only need to define
 this if you're using a different coordinate system in the Diagram.
@@ -366,12 +362,6 @@ A user defined subroutine to replace the default printing method.
 This callback is called from the B<print> method (below) with the
 reference to the B<Dg2Mp> object and a list of lines that are
 part of the TeX diagram source.
-
-=back
-
-=head2 Dg2Mp-specific options:
-
-=over 4
 
 =item B<stone_fontName> =E<gt> 'font'  Default: 'cmssbx10'
 
@@ -415,6 +405,10 @@ sub new {
     $my->configure(%args);
     return($my);
 }
+
+=head1 METHODS
+
+=over 4
 
 =item $dg2mp-E<gt>B<configure> (option =E<gt> value, ?...?)
 
@@ -588,7 +582,7 @@ sub comment {
 
 =item my $tex_source = $dg2mp-E<gt>B<convertDiagram> ($diagram)
 
-Converts a I<Games::Go::Diagram> into TeX/MetaPost.  If B<file> was
+Converts a I<Games::Go::Sgf2Dg::Diagram> into TeX/MetaPost.  If B<file> was
 defined in the B<new> method, the TeX source is dumped into the
 B<file>.tex and the MetaPost source into B<file>.mp.  In any case,
 the TeX source is returned as a string scalar.
@@ -962,7 +956,7 @@ sub _drawMark {
     } elsif ($mark eq 'SQ') {   # SQ[pt]      square
         $func = '_square';
     }
-    $my->mpprint("_$func($x, $y, $color)\n");
+    $my->mpprint("$func($x, $y, $color)\n");
 }
 
 sub _preamble {
@@ -1012,7 +1006,7 @@ __END__
 
 =head1 SEE ALSO
 
-=over 0
+=over
 
 =item L<sgf2dg>(1)
 
@@ -1024,16 +1018,3 @@ Script to convert SGF format files to Go diagrams
 
 Is this a trick question?
 
-=head1 AUTHOR
-
-Reid Augustin, E<lt>reid@hellosix.comE<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2005 by Reid Augustin
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.8.5 or,
-at your option, any later version of Perl 5 you may have available.
-
-=cut

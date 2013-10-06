@@ -1,11 +1,31 @@
+#!/usr/bin/perl
+#===============================================================================
+#
+#  DESCRIPTION:  Modify Makefile.PL after Dist::Zilla is finished
+#
+#       AUTHOR:  Reid Augustin
+#        EMAIL:  reid@LucidPort.com
+#      CREATED:  07/28/2011 03:40:36 PM
+#===============================================================================
 
 use strict;
 use warnings;
+use File::Slurp;
+use File::Spec;
 
-use 5.008;
+my $dir = $ARGV[0] or die "Need build directory";
 
-use ExtUtils::MakeMaker 6.30;
+fix_makefile($dir);
+fix_Sgf2Dg($dir);
+exit 0;
 
+sub fix_makefile {
+    my ($dir) = @_;
+    my $filename = File::Spec->catfile($dir, 'Makefile.PL');
+
+    my $content = read_file($filename);
+
+    my $add = q{
 use Config;
 use File::Slurp;
 use lib 'lib';        # to find FixTeXMakefile.pm
@@ -55,70 +75,16 @@ if (($Config{osname} eq 'dos') or ($Config{osname} eq 'win32')) {     # punt
     $makeMakerOpts{OBJECT} = ('sgfsplit.o');
     $makeMakerOpts{MAN1PODS}{'sgfsplit.c'} = '$(INST_MAN1DIR)/sgfsplit.1';
 }
+};
 
+    # insert all that stuff above near the top of Makefile.PL
+    $content =~ s/^(use ExtUtils::MakeMaker[^\n]*)/$1\n$add/sm;
 
+    # replace EXE_FILES option with %makeMakerOpts
+    $content =~ s/^(\s*)"EXE_FILES"[^\]]*]/$1%makeMakerOpts/sm;
 
-
-my %WriteMakefileArgs = (
-  "ABSTRACT" => "Sgf2Dg.pm",
-  "AUTHOR" => "Reid Augustin <reid\@hellosix.com>",
-  "BUILD_REQUIRES" => {
-    "Test::More" => 0
-  },
-  "CONFIGURE_REQUIRES" => {
-    "ExtUtils::MakeMaker" => "6.30"
-  },
-  "DISTNAME" => "Games-Go-Sgf2Dg",
-  %makeMakerOpts,
-  "LICENSE" => "perl",
-  "NAME" => "Games::Go::Sgf2Dg",
-  "PREREQ_PM" => {
-    "Carp" => 0,
-    "Config" => 0,
-    "Exporter" => 0,
-    "ExtUtils::MakeMaker" => 0,
-    "File::Find" => 0,
-    "File::Slurp" => 0,
-    "File::Spec" => 0,
-    "IO::File" => 0,
-    "PDF::Create" => 0,
-    "POSIX" => 0,
-    "PostScript::File" => 0,
-    "Tk" => 0,
-    "Tk::Canvas" => 0,
-    "Tk::NoteBook" => 0,
-    "constant" => 0,
-    "strict" => 0,
-    "warnings" => 0
-  },
-  "VERSION" => "4.249",
-  "test" => {
-    "TESTS" => "t/*.t"
-  }
-);
-
-
-unless ( eval { ExtUtils::MakeMaker->VERSION(6.56) } ) {
-  my $br = delete $WriteMakefileArgs{BUILD_REQUIRES};
-  my $pp = $WriteMakefileArgs{PREREQ_PM};
-  for my $mod ( keys %$br ) {
-    if ( exists $pp->{$mod} ) {
-      $pp->{$mod} = $br->{$mod} if $br->{$mod} > $pp->{$mod};
-    }
-    else {
-      $pp->{$mod} = $br->{$mod};
-    }
-  }
-}
-
-delete $WriteMakefileArgs{CONFIGURE_REQUIRES}
-  unless eval { ExtUtils::MakeMaker->VERSION(6.52) };
-
-WriteMakefile(%WriteMakefileArgs);
-
-
-
-
+    # tack this onto the end of Makefile.PL
+    $content .= q{
 # no dynamic targets for this package:
 sub MY::dynamic {
     return '';
@@ -159,3 +125,25 @@ write_file('Makefile', $content);
 
 # Find TeX stuff on the system and modify tex/Makefile accordingly
 Games::Go::Sgf2Dg::FixTexMakefile::fix();
+};
+
+    # write modified content back out to Makefile.PL
+    write_file($filename, $content);
+}
+
+# Sgf2Dg.pm needs a valid $VERSION as well as the # VERSION
+# line for Dist::Zilla::Plugin::OurPkgVersion.  After dzil
+# build, it ends up with two $VERSION definitions.  Delete
+# the extra one here
+sub fix_Sgf2Dg {
+    my ($dir) = @_;
+    my $filename = File::Spec->catfile($dir, 'lib', 'Games', 'Go', 'Sgf2Dg.pm');
+
+    my $content = read_file($filename);
+
+    $content =~ s/^[^\n]*delete this line after build[^\n]*\n//g;
+
+    write_file($filename, $content);
+}
+
+
