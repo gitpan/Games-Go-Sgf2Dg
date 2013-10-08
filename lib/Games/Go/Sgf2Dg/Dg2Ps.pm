@@ -39,7 +39,7 @@ if ($@) {
 
 use Carp;
 
-our $VERSION = '4.249'; # VERSION
+our $VERSION = '4.252'; # VERSION
 
 our @ISA = qw(Exporter);
 

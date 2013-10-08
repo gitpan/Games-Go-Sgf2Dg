@@ -32,4 +32,4 @@ requires:
   perl: 5.008
   strict: 0
   warnings: 0
-version: 4.249
+version: 4.252

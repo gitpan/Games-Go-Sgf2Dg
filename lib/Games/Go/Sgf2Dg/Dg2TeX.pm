@@ -33,7 +33,7 @@ require 5.001;
 package Games::Go::Sgf2Dg::Dg2TeX;
 use Carp;
 
-our $VERSION = '4.249'; # VERSION
+our $VERSION = '4.252'; # VERSION
 
 our @ISA = qw(Exporter);
 

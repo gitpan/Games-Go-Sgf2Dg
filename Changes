@@ -1,6 +1,9 @@
 
     Change log for Games::Go::Sgf2Dg
 
+from 4.249 to 4.252:
+    fix coords in MetaPost converter (Dg2Mp)
+
 from 4.246 to 4.249:
     installation:
         move after_build to extra/ dir

@@ -44,7 +44,7 @@ use Tk::NoteBook;
 use Tk::Canvas;
 use Carp;
 
-our $VERSION = '4.249'; # VERSION
+our $VERSION = '4.252'; # VERSION
 
 our @ISA = qw(Exporter);
 

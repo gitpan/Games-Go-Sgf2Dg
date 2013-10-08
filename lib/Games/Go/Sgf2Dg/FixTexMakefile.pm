@@ -24,7 +24,7 @@ use File::Find;
 use File::Slurp;
 use ExtUtils::MakeMaker;    # for 'prompt' function
 
-our $VERSION = '4.249'; # VERSION
+our $VERSION = '4.252'; # VERSION
 
 my ($texmfRoot, $mfdir, $tfmdir, $texInputs, $kpsewhich, %pkFontHash, %wanted);
 sub fix {

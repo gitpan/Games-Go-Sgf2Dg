@@ -40,7 +40,7 @@ canvas pages together.
 use strict;
 require 5.001;
 
-our $VERSION = '4.249'; # VERSION
+our $VERSION = '4.252'; # VERSION
 
 package Games::Go::Sgf2Dg::Dg2TkPs;
 use Games::Go::Sgf2Dg::Dg2Tk;

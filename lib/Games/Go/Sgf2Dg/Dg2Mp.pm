@@ -49,7 +49,7 @@ require 5.001;
 package Games::Go::Sgf2Dg::Dg2Mp;
 use Carp;
 
-our $VERSION = '4.249'; # VERSION
+our $VERSION = '4.252'; # VERSION
 
 our @ISA = qw(Exporter);
 
@@ -650,7 +650,7 @@ sub convertDiagram {
         }
         if ($my->{coords}) {    # right-side coords
             my $x = $my->{rightLine} + 1;
-            my $ycoord = $diagram->ycoord($my->{rightLine} + 1);
+            my $ycoord = $diagram->ycoord($y);
             $my->mpprint("_label($x, $y, \"$ycoord\", black);   % coord\n");
         }
     }

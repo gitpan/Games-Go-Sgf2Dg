@@ -31,7 +31,7 @@ require 5.001;
 
 package Games::Go::Sgf2Dg::Dg2PDF;
 
-our $VERSION = '4.249'; # VERSION
+our $VERSION = '4.252'; # VERSION
 
 eval { require PDF::Create; };   # is this module available?
 if ($@) {

@@ -38,6 +38,6 @@ use strict;
 require 5.005;
 use Games::Go::Sgf2Dg; # the SGF to diagram converter module
 
-our $VERSION = '4.249'; # VERSION
+our $VERSION = '4.252'; # VERSION
 
 Games::Go::Sgf2Dg->run; # parse command line and do the conversion
